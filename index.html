@@ -70,7 +70,6 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px}
 </div>
 
 <div class="body">
-
   <div class="card">
     <div class="card-title">หุ้น / ETF</div>
     <div class="chip-wrap" id="ticker-group"></div>
@@ -130,7 +129,6 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px}
              oninput="document.getElementById('os-v').textContent=this.value">
     </div>
   </div>
-
 </div>
 
 <div class="toast" id="toast"></div>
@@ -142,50 +140,52 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px}
 
 <script>
 const SUPABASE_URL = 'https://acfwyzfntiuackcnarvo.supabase.co'
-// ใส่ SERVICE ROLE KEY ตรงนี้ — ไม่แชร์ให้ใคร
-// ใหม่ — ถามครั้งเดียว เก็บใน localStorage
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjZnd5emZudGl1YWNrY25hcnZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwMjkzMTEsImV4cCI6MjEwNDYwNTMxMX0.WcfGuDP6geA_ug3v1RYy0fVDLKhizaTKfL-8bky4wRQ'
+const SERVICE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjZnd5emZudGl1YWNrY25hcnZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwMjkzMTEsImV4cCI6MjEwNDYwNTMxMX0.WcfGuDP6geA_ug3v1RYy0fVDLKhizaTKfL-8bky4wRQ'
 
 const hdr = {
   'apikey': SERVICE_KEY,
-  'Authorization': `Bearer ${SERVICE_KEY}`,
+  'Authorization': 'Bearer ' + SERVICE_KEY,
   'Content-Type': 'application/json',
   'Prefer': 'return=representation'
 }
 
 let state = {
   tickers:        ['VOO','NVDA','JEPQ'],
-  schedules:      [{time:'08:00',chart:true,news:true,daily:true},{time:'15:00',chart:false,news:true,daily:false},{time:'03:00',chart:true,news:false,daily:true}],
+  schedules:      [
+    {time:'08:00',chart:true, news:true, daily:true },
+    {time:'15:00',chart:false,news:true, daily:false},
+    {time:'03:00',chart:true, news:false,daily:true }
+  ],
   gemini:         {translate:true,sentiment:true,summary:false},
   rsi_overbought: 70,
   rsi_oversold:   30,
+  bot_token:      '',
   recipients:     []
 }
 
 async function init(){
   try {
     const [cfgRes, recRes] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/boswaves_config?id=eq.1&select=*`, {headers: hdr}),
-      fetch(`${SUPABASE_URL}/rest/v1/boswaves_recipients?select=*&order=id`, {headers: hdr})
+      fetch(SUPABASE_URL+'/rest/v1/boswaves_config?id=eq.1&select=*', {headers:hdr}),
+      fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients?select=*&order=id', {headers:hdr})
     ])
-    if(!cfgRes.ok) throw new Error('Config load failed')
+    if(!cfgRes.ok) throw new Error('Config load failed: '+cfgRes.status)
     const cfgRows = await cfgRes.json()
     const recRows = await recRes.json()
     if(cfgRows.length){
       const c = cfgRows[0]
-      state.tickers        = c.tickers        || state.tickers
-      state.schedules = c.schedules || state.schedules
-console.log('schedules from DB:', JSON.stringify(state.schedules))
-      state.gemini         = c.gemini         || state.gemini
-      state.rsi_overbought = c.rsi_overbought || 70
-      state.rsi_oversold   = c.rsi_oversold   || 30
-      state.bot_token = c.bot_token || ''
+      if(c.tickers)        state.tickers        = c.tickers
+      if(c.schedules)      state.schedules      = c.schedules
+      if(c.gemini)         state.gemini         = c.gemini
+      if(c.rsi_overbought) state.rsi_overbought = c.rsi_overbought
+      if(c.rsi_oversold)   state.rsi_oversold   = c.rsi_oversold
+      if(c.bot_token)      state.bot_token      = c.bot_token
     }
     state.recipients = recRows || []
     document.getElementById('conn-status').textContent = '🟢 เชื่อมต่อแล้ว'
   } catch(e){
     document.getElementById('conn-status').textContent = '🔴 ไม่ได้เชื่อมต่อ'
-    showToast('โหลด config ไม่ได้: '+e.message)
+    showToast('โหลดไม่ได้: '+e.message)
   }
   renderAll()
 }
@@ -195,56 +195,81 @@ function renderAll(){
   renderScheds()
   renderRecips()
   renderGemini()
-  document.getElementById('ob').value = state.rsi_overbought
+  document.getElementById('ob').value     = state.rsi_overbought
   document.getElementById('ob-v').textContent = state.rsi_overbought
-  document.getElementById('os').value = state.rsi_oversold
+  document.getElementById('os').value     = state.rsi_oversold
   document.getElementById('os-v').textContent = state.rsi_oversold
 }
 
 function renderTickers(){
   const g = document.getElementById('ticker-group')
   g.innerHTML = ''
-  state.tickers.forEach(t => {
+  state.tickers.forEach(function(t){
     const d = document.createElement('div')
     d.className = 'chip on'
     d.textContent = t
-    d.onclick = () => { state.tickers = state.tickers.filter(x=>x!==t); renderTickers() }
+    d.onclick = function(){ state.tickers = state.tickers.filter(function(x){return x!==t}); renderTickers() }
     g.appendChild(d)
   })
 }
 
 function addTicker(){
   const v = document.getElementById('ticker-inp').value.trim().toUpperCase()
-  if(!v || state.tickers.includes(v)) return
+  if(!v || state.tickers.indexOf(v)>=0) return
   state.tickers.push(v)
   renderTickers()
   document.getElementById('ticker-inp').value = ''
 }
-document.addEventListener('keydown', e => {
+document.addEventListener('keydown', function(e){
   if(e.key==='Enter' && document.activeElement.id==='ticker-inp') addTicker()
 })
 
 function renderScheds(){
   const el = document.getElementById('sched-list')
   el.innerHTML = ''
-  state.schedules.forEach((s,i) => {
-    const row = document.createElement('div')
+  state.schedules.forEach(function(s, i){
+    const h = parseInt(s.time)
+    const icon = h<12 ? '🌅' : h<18 ? '🕐' : '🌙'
+
+    const row  = document.createElement('div')
     row.className = 'sched-item'
-    const icon = parseInt(s.time)<12?'🌅':parseInt(s.time)<18?'🕐':'🌙'
-    row.innerHTML = `
-      <span class="time-lbl">${icon} ${s.time}</span>
-      <div class="mini-wrap">
-        <div class="mini ${s.chart?'on':''}" onclick="toggleSched(${i},'chart')">กราฟ</div>
-        <div class="mini ${s.news?'on':''}" onclick="toggleSched(${i},'news')">ข่าว</div>
-        <div class="mini ${s.daily?'on':''}" onclick="toggleSched(${i},'daily')">สรุป</div>
-      </div>
-      <button class="del" onclick="delSched(${i})">🗑</button>`
+
+    const lbl = document.createElement('span')
+    lbl.className = 'time-lbl'
+    lbl.textContent = icon+' '+s.time
+
+    const wrap = document.createElement('div')
+    wrap.className = 'mini-wrap'
+
+    // สร้าง chip แต่ละตัวแยก — ไม่ใช้ template literal ใน onclick
+    var keys = ['chart','news','daily']
+    var labels = ['กราฟ','ข่าว','สรุป']
+    keys.forEach(function(key, ki){
+      const m = document.createElement('div')
+      m.className = 'mini' + (s[key] ? ' on' : '')
+      m.textContent = labels[ki]
+      m.addEventListener('click', function(){
+        state.schedules[i][key] = !state.schedules[i][key]
+        m.classList.toggle('on', state.schedules[i][key])
+      })
+      wrap.appendChild(m)
+    })
+
+    const btn = document.createElement('button')
+    btn.className = 'del'
+    btn.textContent = '🗑'
+    btn.addEventListener('click', function(){
+      state.schedules.splice(i, 1)
+      renderScheds()
+    })
+
+    row.appendChild(lbl)
+    row.appendChild(wrap)
+    row.appendChild(btn)
     el.appendChild(row)
   })
 }
 
-function toggleSched(i, key){ state.schedules[i][key] = !state.schedules[i][key]; renderScheds() }
-function delSched(i){ state.schedules.splice(i,1); renderScheds() }
 function addSched(){
   const t = document.getElementById('new-time').value
   if(!t) return
@@ -255,56 +280,64 @@ function addSched(){
 function renderRecips(){
   const el = document.getElementById('recip-list')
   el.innerHTML = ''
-  state.recipients.forEach((r,i) => {
+  state.recipients.forEach(function(r, i){
     const row = document.createElement('div')
     row.className = 'recip-item'
     const masked = r.chat_id.length>4 ? r.chat_id.slice(0,-4)+'****' : r.chat_id
-    row.innerHTML = `
-      <div>
-        <div class="recip-name">${r.name}</div>
-        <div class="recip-id">${masked}</div>
-      </div>
-      <label class="sw">
-        <input type="checkbox" ${r.active?'checked':''} onchange="toggleRecip(${i})">
-        <div class="sw-track"></div><div class="sw-thumb"></div>
-      </label>
-      <button class="del" onclick="delRecip(${i})">🗑</button>`
+
+    const info = document.createElement('div')
+    info.innerHTML = '<div class="recip-name">'+r.name+'</div><div class="recip-id">'+masked+'</div>'
+
+    const sw = document.createElement('label')
+    sw.className = 'sw'
+    const chk = document.createElement('input')
+    chk.type = 'checkbox'
+    chk.checked = !!r.active
+    chk.addEventListener('change', function(){ state.recipients[i].active = chk.checked })
+    sw.appendChild(chk)
+    sw.innerHTML += '<div class="sw-track"></div><div class="sw-thumb"></div>'
+
+    const del = document.createElement('button')
+    del.className = 'del'
+    del.textContent = '🗑'
+    del.addEventListener('click', function(){ delRecip(i) })
+
+    row.appendChild(info)
+    row.appendChild(sw)
+    row.appendChild(del)
     el.appendChild(row)
   })
 }
 
-function toggleRecip(i){ state.recipients[i].active = !state.recipients[i].active }
-
 async function delRecip(i){
   const r = state.recipients[i]
   if(r.id){
-    await fetch(`${SUPABASE_URL}/rest/v1/boswaves_recipients?id=eq.${r.id}`,
-      {method:'DELETE', headers:hdr})
+    await fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients?id=eq.'+r.id, {method:'DELETE',headers:hdr})
   }
   state.recipients.splice(i,1)
   renderRecips()
 }
 
 async function addRecip(){
-  const name = document.getElementById('rname').value.trim()
+  const name    = document.getElementById('rname').value.trim()
   const chat_id = document.getElementById('rid').value.trim()
   if(!name||!chat_id){ showToast('กรุณาใส่ชื่อและ Chat ID'); return }
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/boswaves_recipients`,
-      {method:'POST', headers:hdr, body: JSON.stringify({name,chat_id,active:true})})
+    const res  = await fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients',
+      {method:'POST', headers:hdr, body:JSON.stringify({name:name,chat_id:chat_id,active:true})})
     const rows = await res.json()
-    state.recipients.push(rows[0] || {name,chat_id,active:true})
+    state.recipients.push(rows[0] || {name:name,chat_id:chat_id,active:true})
     renderRecips()
     document.getElementById('rname').value = ''
-    document.getElementById('rid').value = ''
+    document.getElementById('rid').value   = ''
     showToast('เพิ่มผู้รับสำเร็จ ✓')
   } catch(e){ showToast('เพิ่มไม่ได้: '+e.message) }
 }
 
 function renderGemini(){
-  document.querySelectorAll('#gemini-group .chip').forEach(c => {
+  document.querySelectorAll('#gemini-group .chip').forEach(function(c){
     c.classList.toggle('on', !!state.gemini[c.dataset.v])
-    c.onclick = () => {
+    c.onclick = function(){
       state.gemini[c.dataset.v] = !state.gemini[c.dataset.v]
       c.classList.toggle('on', state.gemini[c.dataset.v])
     }
@@ -315,35 +348,28 @@ async function testSend(){
   const btn = document.getElementById('test-btn')
   btn.textContent = '⏳ กำลังส่ง...'
   btn.disabled = true
-
-  const botToken = state.bot_token || ''
-  const activeRecips = state.recipients.filter(r => r.active)
-
-  if(!botToken || activeRecips.length === 0){
+  const botToken    = state.bot_token || ''
+  const activeRecips = state.recipients.filter(function(r){ return r.active })
+  if(!botToken || activeRecips.length===0){
     showToast('ไม่มีผู้รับหรือ Bot Token')
     btn.textContent = '✉️ ทดสอบส่งให้ทุกคน'
     btn.disabled = false
     return
   }
-
-  let ok = 0
-  for(const r of activeRecips){
+  var ok = 0
+  for(var ri=0; ri<activeRecips.length; ri++){
     try {
       const res = await fetch(
-        `https://api.telegram.org/bot${botToken}/sendMessage`,
-        { method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({
-            chat_id: r.chat_id,
-            text: `✅ BOSWaves ทดสอบส่งสำเร็จ!\nผู้รับ: ${r.name}\nเวลา: ${new Date().toLocaleString('th-TH')}`
-          })
-        }
-      )
+        'https://api.telegram.org/bot'+botToken+'/sendMessage',
+        {method:'POST', headers:{'Content-Type':'application/json'},
+         body:JSON.stringify({
+           chat_id: activeRecips[ri].chat_id,
+           text: '✅ BOSWaves ทดสอบส่งสำเร็จ!\nผู้รับ: '+activeRecips[ri].name+'\nเวลา: '+new Date().toLocaleString('th-TH')
+         })})
       if(res.ok) ok++
     } catch(e){}
   }
-
-  showToast(ok > 0 ? `ส่งสำเร็จ ${ok}/${activeRecips.length} คน ✓` : 'ส่งไม่ได้ ตรวจสอบ Token')
+  showToast(ok>0 ? 'ส่งสำเร็จ '+ok+'/'+activeRecips.length+' คน ✓' : 'ส่งไม่ได้ ตรวจสอบ Token')
   btn.textContent = '✉️ ทดสอบส่งให้ทุกคน'
   btn.disabled = false
 }
@@ -353,7 +379,6 @@ async function saveConfig(){
   btn.textContent = '💾 กำลังบันทึก...'
   btn.disabled = true
   try {
-    // อัปเดต config
     const cfgBody = {
       tickers:        state.tickers,
       schedules:      state.schedules,
@@ -362,22 +387,17 @@ async function saveConfig(){
       rsi_oversold:   parseInt(document.getElementById('os').value),
       updated_at:     new Date().toISOString()
     }
-    const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/boswaves_config?id=eq.1`,
-  {method:'PATCH', headers:hdr, body: JSON.stringify(cfgBody)})
-console.log('PATCH status:', patchRes.status)
-const patchBody = await patchRes.text()
-console.log('PATCH body:', patchBody)
+    await fetch(SUPABASE_URL+'/rest/v1/boswaves_config?id=eq.1',
+      {method:'PATCH', headers:hdr, body:JSON.stringify(cfgBody)})
 
-    // อัปเดต recipients active status
-    for(const r of state.recipients){
+    for(var ri=0; ri<state.recipients.length; ri++){
+      const r = state.recipients[ri]
       if(r.id){
-        await fetch(`${SUPABASE_URL}/rest/v1/boswaves_recipients?id=eq.${r.id}`,
-          {method:'PATCH', headers:hdr, body: JSON.stringify({active:r.active})})
+        await fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients?id=eq.'+r.id,
+          {method:'PATCH', headers:hdr, body:JSON.stringify({active:r.active})})
       }
     }
-
-    document.getElementById('save-status').textContent =
-      'บันทึกเมื่อ ' + new Date().toLocaleTimeString('th-TH')
+    document.getElementById('save-status').textContent = 'บันทึกเมื่อ '+new Date().toLocaleTimeString('th-TH')
     showToast('บันทึกสำเร็จ ✓')
   } catch(e){
     showToast('บันทึกไม่ได้: '+e.message)
@@ -390,7 +410,7 @@ function showToast(msg){
   const t = document.getElementById('toast')
   t.textContent = msg
   t.style.display = 'block'
-  setTimeout(()=>t.style.display='none', 3000)
+  setTimeout(function(){ t.style.display='none' }, 3000)
 }
 
 init()
