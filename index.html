@@ -144,11 +144,7 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px}
 const SUPABASE_URL = 'https://acfwyzfntiuackcnarvo.supabase.co'
 // ใส่ SERVICE ROLE KEY ตรงนี้ — ไม่แชร์ให้ใคร
 // ใหม่ — ถามครั้งเดียว เก็บใน localStorage
-let SERVICE_KEY = localStorage.getItem('sb_service_key') || ''
-if (!SERVICE_KEY) {
-  SERVICE_KEY = prompt('กรุณาใส่ Supabase Service Role Key:') || ''
-  if (SERVICE_KEY) localStorage.setItem('sb_service_key', SERVICE_KEY)
-}
+const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjZnd5emZudGl1YWNrY25hcnZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwMjkzMTEsImV4cCI6MjEwNDYwNTMxMX0.WcfGuDP6geA_ug3v1RYy0fVDLKhizaTKfL-8bky4wRQ'
 
 const hdr = {
   'apikey': SERVICE_KEY,
