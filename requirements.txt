@@ -1,0 +1,7 @@
+numpy
+matplotlib
+yfinance
+requests
+feedparser
+python-dotenv
+google-generativeai
