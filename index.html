@@ -178,7 +178,8 @@ async function init(){
     if(cfgRows.length){
       const c = cfgRows[0]
       state.tickers        = c.tickers        || state.tickers
-      state.schedules      = c.schedules      || state.schedules
+      state.schedules = c.schedules || state.schedules
+console.log('schedules from DB:', JSON.stringify(state.schedules))
       state.gemini         = c.gemini         || state.gemini
       state.rsi_overbought = c.rsi_overbought || 70
       state.rsi_oversold   = c.rsi_oversold   || 30
