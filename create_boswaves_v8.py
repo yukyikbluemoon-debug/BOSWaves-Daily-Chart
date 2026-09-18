@@ -274,6 +274,31 @@ def fetch_market_context() -> dict:
     return result
 
 # ═══════════════════════════════════════════════════════════════════
+#  [+28] GOLD PRICE — XAU/USD จาก gold-api.com
+# ═══════════════════════════════════════════════════════════════════
+def fetch_gold_price() -> dict:
+    """ดึงราคาทองคำ XAU/USD"""
+    result = {"price": None, "change_pct": None}
+    try:
+        import urllib.request, json
+        req = urllib.request.Request(
+            "https://api.gold-api.com/price/XAU",
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+            price = data.get("price")
+            prev  = data.get("prev_close_price")
+            if price:
+                result["price"] = float(price)
+            if price and prev and float(prev) != 0:
+                result["change_pct"] = (float(price) - float(prev)) / float(prev) * 100
+        log.info(f"  Gold: ${result['price']:,.2f}" if result["price"] else "  Gold: N/A")
+    except Exception as e:
+        log.warning(f"  gold_price error: {e}")
+    return result
+
+# ═══════════════════════════════════════════════════════════════════
 #  [+23] Yahoo Finance RSS
 # ═══════════════════════════════════════════════════════════════════
 def fetch_yahoo_news(ticker: str, n: int = 3) -> list[str]:
@@ -531,8 +556,10 @@ log.info(f"tickers: {TICKERS}")
 log.info("ดึงข้อมูลตลาดรวม...")
 fear_greed  = fetch_fear_greed()
 market_ctx  = fetch_market_context()
+gold        = fetch_gold_price()
 log.info(f"  Fear&Greed: {fear_greed}")
 log.info(f"  Market: {market_ctx}")
+log.info(f"  Gold: {gold}")
 
 ticker_df = {}   # เก็บ df ไว้ใช้ตอนสร้าง daily chart
 
