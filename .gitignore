@@ -1,0 +1,13 @@
+# ห้าม commit ไฟล์เหล่านี้เด็ดขาด
+.env
+*.env
+
+# output ของสคริปต์
+output/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
