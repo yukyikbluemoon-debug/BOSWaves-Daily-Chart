@@ -28,8 +28,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="urllib3")
 
 from dotenv import load_dotenv
 _SCRIPT_DIR = Path(__file__).resolve().parent
-load_dotenv(_SCRIPT_DIR / ".env")   # โหลด .env ข้างๆ ไฟล์ (local)
-# หมายเหตุ: บน GitHub Actions ตัวแปรจะมาจาก Secrets โดยตรง ไม่ต้องมี .env
+load_dotenv(_SCRIPT_DIR / ".env")
 
 BOT_TOKEN      = os.getenv("TELEGRAM_TOKEN", "")
 CHAT_ID        = os.getenv("TELEGRAM_CHAT_ID", "")
@@ -46,9 +45,7 @@ ZONE_WIDTH_FACTOR = 0.4
 FIB_EXTENSIONS    = [1.0, 1.272, 1.618, 2.0]
 EMA_SHORT         = 50
 EMA_LONG          = 200
-# รองรับทั้ง local (Windows) และ GitHub Actions (Linux)
-# กำหนดด้วย env var OUTPUT_DIR หรือใช้ folder "output" ข้างๆ ไฟล์
-OUTPUT_DIR        = Path(os.getenv("OUTPUT_DIR", _SCRIPT_DIR / "output"))
+OUTPUT_DIR        = Path(os.getenv("OUTPUT_DIR", str(_SCRIPT_DIR / "output")))
 LOG_DIR           = OUTPUT_DIR / "logs"
 DOWNLOAD_RETRIES  = 3
 DOWNLOAD_DELAY    = 5
@@ -91,76 +88,22 @@ from matplotlib import font_manager
 from matplotlib.patches import Rectangle
 from matplotlib.lines import Line2D
 
-# ═══════════════════════════════════════════════════════════════════
-#  GEMINI — auto-detect model ที่ใช้งานได้จริง
-# ═══════════════════════════════════════════════════════════════════
-_gemini            = None
-_gemini_model_name = None
-_gemini_error      = None   # เก็บ error ไว้แจ้ง Telegram หลัง bot/chat พร้อม
-
-def _pick_gemini_model(preferred: list) -> str | None:
-    """เลือก model แรกที่มีอยู่จริงและรองรับ generateContent"""
-    try:
-        available = [
-            m.name.replace("models/", "")
-            for m in genai.list_models()
-            if "generateContent" in m.supported_generation_methods
-        ]
-        log.info(f"  Gemini models available: {available}")
-        for name in preferred:
-            if name in available:
-                log.info(f"  เลือก Gemini model: {name}")
-                return name
-        # fallback: เอาตัวแรกที่มีคำว่า "flash" และไม่ใช่ image/tts
-        flash = [m for m in available
-                 if "flash" in m and "image" not in m and "tts" not in m]
-        if flash:
-            log.info(f"  Gemini fallback model: {flash[0]}")
-            return flash[0]
-        log.warning("  ไม่พบ Gemini flash model เลย")
-    except Exception as e:
-        log.warning(f"  list_models error: {e}")
-        raise
-    return None
-
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    _MODEL_PRIORITY = [
-        "gemini-3.6-flash",
-        "gemini-3.1-flash-lite",
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
-        "gemini-2.0-flash",
-        "gemini-1.5-flash",
-    ]
-    try:
-        _gemini_model_name = _pick_gemini_model(_MODEL_PRIORITY)
-        if _gemini_model_name:
-            _gemini = genai.GenerativeModel(_gemini_model_name)
-        else:
-            _gemini_error = "ไม่พบ Gemini model ที่รองรับใน API"
-            log.warning(f"  {_gemini_error}")
-    except Exception as _e:
-        _gemini_error = f"Gemini API error ตอน init: {_e}"
-        log.warning(f"  {_gemini_error}")
+    _gemini = genai.GenerativeModel("gemini-3.6-flash")
 else:
-    _gemini_error = "ไม่มี GEMINI_API_KEY"
+    _gemini = None
 
 # ═══════════════════════════════════════════════════════════════════
 #  FONT SETUP
 # ═══════════════════════════════════════════════════════════════════
 _FONT_CANDIDATES = [
-    # Windows paths (local)
     (r"C:\Windows\Fonts\tahomabd.ttf", "Tahoma"),
     (r"C:\Windows\Fonts\tahoma.ttf",   "Tahoma"),
     (r"C:\Windows\Fonts\leelawdb.ttf", "Leelawadee UI"),
     (r"C:\Windows\Fonts\leelawad.ttf", "Leelawadee UI"),
     (r"C:\Windows\Fonts\angsa.ttf",    "Angsana New"),
     (r"C:\Windows\Fonts\angsab.ttf",   "Angsana New"),
-    # Linux paths (GitHub Actions) — ติดตั้งผ่าน apt: fonts-thai-tlwg
-    ("/usr/share/fonts/truetype/tlwg/Garuda.ttf",      "Garuda"),
-    ("/usr/share/fonts/truetype/tlwg/Loma.ttf",        "Loma"),
-    ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf","DejaVu Sans"),
 ]
 _loaded_families = []
 for _fp, _fm in _FONT_CANDIDATES:
@@ -305,8 +248,8 @@ def fetch_fear_greed() -> dict:
 #  [+25] VIX + S&P500
 # ═══════════════════════════════════════════════════════════════════
 def fetch_market_context() -> dict:
-    """ดึง VIX และ S&P500 % วันนี้"""
-    result = {"vix": None, "sp500_chg": None}
+    """ดึง VIX, S&P500 และ USD/THB"""
+    result = {"vix": None, "sp500_chg": None, "sp500_last": None, "usdthb": None}
     try:
         vix_data = yf.download("^VIX", period="2d", progress=False,
                                auto_adjust=True)
@@ -318,7 +261,14 @@ def fetch_market_context() -> dict:
                               auto_adjust=True)
         if len(sp_data) >= 2:
             c = sp_data['Close'].squeeze().values
-            result["sp500_chg"] = round((c[-1] - c[-2]) / c[-2] * 100, 2)
+            result["sp500_last"] = round(float(c[-1]), 2)
+            result["sp500_chg"]  = round((c[-1] - c[-2]) / c[-2] * 100, 2)
+
+        thb_data = yf.download("THB=X", period="2d", progress=False,
+                               auto_adjust=True)
+        if not thb_data.empty:
+            result["usdthb"] = round(float(
+                thb_data['Close'].squeeze().iloc[-1]), 2)
     except Exception as e:
         log.warning(f"  market_context error: {e}")
     return result
@@ -339,14 +289,118 @@ def fetch_yahoo_news(ticker: str, n: int = 3) -> list[str]:
     return headlines
 
 # ═══════════════════════════════════════════════════════════════════
+#  [+29] DAILY REPORT — chart 3 กราฟรวม + caption สั้น
+# ═══════════════════════════════════════════════════════════════════
+def build_daily_chart(ticker_data: dict) -> Path | None:
+    """สร้างรูป 3 กราฟ simple line VOO/NVDA/JEPQ รวมในรูปเดียว"""
+    try:
+        fig, axes = plt.subplots(3, 1, figsize=(10, 9),
+                                 facecolor='#0B0E14')
+        fig.subplots_adjust(hspace=0.35, top=0.93, bottom=0.06,
+                            left=0.08, right=0.97)
+        colors = {'VOO': '#3ECF8E', 'NVDA': '#F97316', 'JEPQ': '#60A5FA'}
+
+        for ax, ticker in zip(axes, ["VOO", "NVDA", "JEPQ"]):
+            df = ticker_data.get(ticker)
+            ax.set_facecolor('#0B0E14')
+            if df is None:
+                ax.text(0.5, 0.5, f'{ticker}: ไม่มีข้อมูล',
+                        ha='center', va='center', color='white',
+                        transform=ax.transAxes)
+                continue
+
+            closes = df['Close'].squeeze().values.astype(float)
+            dates  = mdates.date2num(df.index)
+            col    = colors.get(ticker, '#FFFFFF')
+
+            ax.plot(dates, closes, color=col, linewidth=1.4)
+            ax.fill_between(dates, closes, closes.min(),
+                            alpha=0.08, color=col)
+
+            last  = closes[-1]
+            prev  = closes[-2] if len(closes) >= 2 else last
+            chg   = (last - prev) / prev * 100
+            arrow = "▲" if chg >= 0 else "▼"
+            chg_c = '#3ECF8E' if chg >= 0 else '#FF5A5A'
+
+            ax.set_title(
+                f'{ticker}   ${last:.2f}  {arrow} {abs(chg):.2f}%',
+                color=col, fontsize=10, fontweight='bold', loc='left', pad=4)
+            ax.tick_params(colors='#888888', labelsize=7)
+            ax.grid(True, alpha=0.07, linestyle='--')
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %y'))
+            for spine in ax.spines.values():
+                spine.set_edgecolor('#333333')
+
+            # ไฮไลต์ราคาล่าสุด
+            ax.annotate(f'${last:.2f}',
+                        xy=(dates[-1], last),
+                        xytext=(5, 0), textcoords='offset points',
+                        color=chg_c, fontsize=8, va='center')
+
+        fig.suptitle(f'Daily Summary — {now_str}',
+                     color='white', fontsize=11, fontweight='bold')
+        out = OUTPUT_DIR / "daily_summary.png"
+        fig.savefig(str(out), dpi=110, facecolor='#0B0E14',
+                    edgecolor='none', bbox_inches='tight')
+        plt.close(fig)
+        log.info("  Daily chart บันทึกสำเร็จ")
+        return out
+    except Exception as e:
+        log.error(f"  Daily chart error: {e}")
+        return None
+
+def build_daily_caption(ticker_data: dict, market_ctx: dict,
+                         fear_greed: dict, gold: dict) -> str:
+    """caption สั้น สรุปราคา + market"""
+    lines = [f"<b>📊 Daily Summary — {now_str}</b>\n"]
+
+    for ticker in ["VOO", "NVDA", "JEPQ"]:
+        df = ticker_data.get(ticker)
+        if df is None:
+            lines.append(f"{ticker}  N/A")
+            continue
+        closes = df['Close'].squeeze().values.astype(float)
+        last   = closes[-1]
+        prev   = closes[-2] if len(closes) >= 2 else last
+        chg    = (last - prev) / prev * 100
+        arrow  = "▲" if chg >= 0 else "▼"
+        lines.append(f"<b>{ticker}</b>  ${last:.2f}  {arrow} {abs(chg):.2f}%")
+
+    lines.append("━━━━━━━━━━━━━━━━")
+
+    sp_chg  = market_ctx.get("sp500_chg")
+    sp_last = market_ctx.get("sp500_last")
+    vix     = market_ctx.get("vix")
+    usdthb  = market_ctx.get("usdthb")
+
+    sp_str  = (f"${sp_last:,.2f} ({'+' if (sp_chg or 0)>=0 else ''}{sp_chg:.2f}%)"
+               if sp_last else "N/A")
+    vix_str = f"{vix:.1f}" if vix else "N/A"
+    thb_str = f"{usdthb:.2f}" if usdthb else "N/A"
+
+    fg_val   = fear_greed.get("value")
+    fg_label = fear_greed.get("label_th", "N/A")
+    fg_str   = f"{fg_val:.0f} ({fg_label})" if fg_val is not None else "N/A"
+
+    gold_p   = gold.get("price")
+    gold_str = f"${gold_p:,.2f}" if gold_p else "N/A"
+
+    lines.append(f"🌍 S&P500: {sp_str}  |  VIX: {vix_str}")
+    lines.append(f"😱 Fear&Greed: {fg_str}")
+    lines.append(f"🥇 ทองคำ: {gold_str}")
+    lines.append(f"💱 USD/THB: {thb_str}")
+    lines.append("\n<i>⚠️ ไม่ใช่คำแนะนำทางการเงิน</i>")
+
+    return "\n".join(lines)
+
+# ═══════════════════════════════════════════════════════════════════
 #  [+26] GEMINI — แปลและสรุปข่าว
 # ═══════════════════════════════════════════════════════════════════
-def translate_news_gemini(ticker: str, headlines: list[str]) -> tuple[list[str], str | None]:
-    """ส่งพาดหัวข่าวให้ Gemini แปลและสรุปเป็นภาษาไทยสั้นๆ
-    คืน (รายการข่าว, error_message หรือ None ถ้าสำเร็จ)"""
+def translate_news_gemini(ticker: str, headlines: list[str]) -> list[str]:
+    """ส่งพาดหัวข่าวให้ Gemini แปลและสรุปเป็นภาษาไทยสั้นๆ"""
     if not _gemini or not headlines:
-        err = _gemini_error or "ไม่มี Gemini / ไม่มีข่าว"
-        return headlines, err
+        return headlines  # fallback: คืนภาษาอังกฤษเดิม
 
     prompt = (
         f"ต่อไปนี้คือพาดหัวข่าวหุ้น {ticker} จาก Yahoo Finance "
@@ -360,15 +414,15 @@ def translate_news_gemini(ticker: str, headlines: list[str]) -> tuple[list[str],
         resp  = _gemini.generate_content(prompt)
         lines = [l.strip() for l in resp.text.strip().splitlines()
                  if l.strip() and l.strip()[0].isdigit()]
+        # ตัด "1. " ออกเหลือแค่เนื้อหา
         cleaned = []
         for l in lines:
             parts = l.split(". ", 1)
             cleaned.append(parts[1] if len(parts) > 1 else l)
-        return (cleaned if cleaned else headlines), None   # สำเร็จ
+        return cleaned if cleaned else headlines
     except Exception as e:
-        err = f"Gemini translate error ({_gemini_model_name}): {e}"
-        log.warning(f"  {err}")
-        return headlines, err   # fallback + error
+        log.warning(f"  gemini translate {ticker}: {e}")
+        return headlines  # fallback
 
 # ═══════════════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
@@ -480,6 +534,8 @@ market_ctx  = fetch_market_context()
 log.info(f"  Fear&Greed: {fear_greed}")
 log.info(f"  Market: {market_ctx}")
 
+ticker_df = {}   # เก็บ df ไว้ใช้ตอนสร้าง daily chart
+
 for ticker in TICKERS:
     log.info(f"--- {ticker} ---")
     t0 = datetime.now()
@@ -491,6 +547,7 @@ for ticker in TICKERS:
         if df is None:
             raise ValueError(f"download ล้มเหลวทุก {DOWNLOAD_RETRIES} attempt")
         log.info(f"  download OK — {len(df)} bars")
+        ticker_df[ticker] = df   # เก็บไว้ใช้ daily chart
 
         extra = fetch_extra_info(ticker)
 
@@ -498,19 +555,8 @@ for ticker in TICKERS:
         log.info(f"  ดึงข่าว {ticker}...")
         headlines = fetch_yahoo_news(ticker, NEWS_PER_TICKER)
         log.info(f"  ได้ข่าว {len(headlines)} ข่าว")
-        news_th, gemini_err = translate_news_gemini(ticker, headlines)
-        if gemini_err:
-            log.warning(f"  Gemini ไม่ทำงาน: {gemini_err}")
-            # แจ้ง Telegram ว่า Gemini มีปัญหา (แจ้งแค่ ticker แรก ไม่แจ้งซ้ำ)
-            if ticker == TICKERS[0]:
-                tg_send_text(
-                    f"⚠️ <b>BOSWaves — Gemini API มีปัญหา</b>\n"
-                    f"📌 Model: <code>{_gemini_model_name or 'ไม่พบ'}</code>\n"
-                    f"❌ Error: <code>{gemini_err}</code>\n"
-                    f"📰 ข่าวจะแสดงเป็นภาษาอังกฤษแทน"
-                )
-        else:
-            log.info(f"  แปลข่าวเสร็จ (model: {_gemini_model_name})")
+        news_th = translate_news_gemini(ticker, headlines)
+        log.info(f"  แปลข่าวเสร็จ")
 
         close  = df['Close'].squeeze().values.astype(float)
         high   = df['High'].squeeze().values.astype(float)
@@ -738,6 +784,25 @@ for ticker in TICKERS:
         log.error(f"  ✗ {ticker} ล้มเหลว: {exc}")
         failed.append(ticker)
         tg_send_text(f"⚠️ <b>BOSWaves cronjob error</b>\n{ticker}: {exc}")
+
+# ═══════════════════════════════════════════════════════════════════
+#  [+29] DAILY CHART — ส่งหลัง BOSWaves ครบทุก ticker
+# ═══════════════════════════════════════════════════════════════════
+log.info("--- Daily Summary Chart ---")
+try:
+    daily_out = build_daily_chart(ticker_df)
+    if daily_out:
+        daily_cap = build_daily_caption(ticker_df, market_ctx, fear_greed, gold)
+        ok = tg_send_photo(daily_out, daily_cap)
+        if ok:
+            log.info("  ✓ Daily chart ส่ง Telegram สำเร็จ")
+        else:
+            log.error("  ✗ Daily chart ส่ง Telegram ล้มเหลว")
+    else:
+        log.error("  ✗ Daily chart สร้างรูปล้มเหลว")
+except Exception as e:
+    log.error(f"  ✗ Daily chart error: {e}")
+    tg_send_text(f"⚠️ <b>BOSWaves — Daily Chart error</b>\n{e}")
 
 # ═══════════════════════════════════════════════════════════════════
 #  RUN SUMMARY
