@@ -59,16 +59,15 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px}
 .btn-save:active{opacity:.85}
 .toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#0d2b1e;border:1px solid var(--accent);color:var(--accent);padding:8px 20px;border-radius:20px;font-size:13px;display:none;z-index:100;white-space:nowrap}
 .status{font-size:11px;color:var(--muted);text-align:center;margin-top:6px}
+.bot-tag{font-size:10px;color:var(--muted);background:#1e2330;border-radius:4px;padding:1px 5px;margin-left:4px}
 </style>
 </head>
 <body>
-
 <div class="topbar">
   <span>📈</span>
   <h1>BOSWaves ตั้งค่า</h1>
   <span id="conn-status">กำลังโหลด...</span>
 </div>
-
 <div class="body">
   <div class="card">
     <div class="card-title">หุ้น / ETF</div>
@@ -78,7 +77,6 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px}
       <button class="btn-sm" onclick="addTicker()">+ เพิ่ม</button>
     </div>
   </div>
-
   <div class="card">
     <div class="card-title">รอบส่ง (จันทร์–ศุกร์)</div>
     <div id="sched-list"></div>
@@ -87,20 +85,19 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px}
       <button class="btn-sm" onclick="addSched()">+ เพิ่มรอบ</button>
     </div>
   </div>
-
   <div class="card">
     <div class="card-title">ผู้รับ Telegram</div>
     <div id="recip-list"></div>
     <div class="recip-add">
       <input id="rname" placeholder="ชื่อ เช่น เพื่อน A">
       <input id="rid" placeholder="Chat ID เช่น 9876543210">
+      <input id="rtoken" placeholder="Bot Token (ว่าง = ใช้บอทหลัก)">
       <button class="btn-sm" onclick="addRecip()" style="width:100%;padding:8px">+ เพิ่มผู้รับ</button>
     </div>
     <button class="btn-block btn-test" id="test-btn" onclick="testSend()">
       ✉️ ทดสอบส่งให้ทุกคน
     </button>
   </div>
-
   <div class="card">
     <div class="card-title">Gemini AI</div>
     <div class="chip-wrap" id="gemini-group">
@@ -109,7 +106,6 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px}
       <div class="chip" data-v="summary">สรุปภาพรวม</div>
     </div>
   </div>
-
   <div class="card">
     <div class="card-title">แจ้งเตือน RSI</div>
     <div class="slider-wrap">
@@ -130,44 +126,35 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px}
     </div>
   </div>
 </div>
-
 <div class="toast" id="toast"></div>
-
 <div class="save-bar">
   <button class="btn-save" onclick="saveConfig()">💾 บันทึกการตั้งค่า</button>
   <div class="status" id="save-status"></div>
 </div>
-
 <script>
 const SUPABASE_URL = 'https://acfwyzfntiuackcnarvo.supabase.co'
 const SERVICE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjZnd5emZudGl1YWNrY25hcnZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwMjkzMTEsImV4cCI6MjEwNDYwNTMxMX0.WcfGuDP6geA_ug3v1RYy0fVDLKhizaTKfL-8bky4wRQ'
-
 const hdr = {
   'apikey': SERVICE_KEY,
-  'Authorization': 'Bearer ' + SERVICE_KEY,
+  'Authorization': 'Bearer '+SERVICE_KEY,
   'Content-Type': 'application/json',
   'Prefer': 'return=representation'
 }
-
 let state = {
-  tickers:        ['VOO','NVDA','JEPQ'],
-  schedules:      [
-    {time:'08:00',chart:true, news:true, daily:true },
-    {time:'15:00',chart:false,news:true, daily:false},
-    {time:'03:00',chart:true, news:false,daily:true }
+  tickers:['VOO','NVDA','JEPQ'],
+  schedules:[
+    {time:'08:00',chart:true,news:true,daily:true},
+    {time:'15:00',chart:false,news:true,daily:false},
+    {time:'03:00',chart:true,news:false,daily:true}
   ],
-  gemini:         {translate:true,sentiment:true,summary:false},
-  rsi_overbought: 70,
-  rsi_oversold:   30,
-  bot_token:      '',
-  recipients:     []
+  gemini:{translate:true,sentiment:true,summary:false},
+  rsi_overbought:70,rsi_oversold:30,bot_token:'',recipients:[]
 }
-
 async function init(){
   try {
-    const [cfgRes, recRes] = await Promise.all([
-      fetch(SUPABASE_URL+'/rest/v1/boswaves_config?id=eq.1&select=*', {headers:hdr}),
-      fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients?select=*&order=id', {headers:hdr})
+    const [cfgRes,recRes] = await Promise.all([
+      fetch(SUPABASE_URL+'/rest/v1/boswaves_config?id=eq.1&select=*',{headers:hdr}),
+      fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients?select=*&order=id',{headers:hdr})
     ])
     if(!cfgRes.ok) throw new Error('Config load failed: '+cfgRes.status)
     const cfgRows = await cfgRes.json()
@@ -189,18 +176,13 @@ async function init(){
   }
   renderAll()
 }
-
 function renderAll(){
-  renderTickers()
-  renderScheds()
-  renderRecips()
-  renderGemini()
-  document.getElementById('ob').value     = state.rsi_overbought
+  renderTickers(); renderScheds(); renderRecips(); renderGemini()
+  document.getElementById('ob').value = state.rsi_overbought
   document.getElementById('ob-v').textContent = state.rsi_overbought
-  document.getElementById('os').value     = state.rsi_oversold
+  document.getElementById('os').value = state.rsi_oversold
   document.getElementById('os-v').textContent = state.rsi_oversold
 }
-
 function renderTickers(){
   const g = document.getElementById('ticker-group')
   g.innerHTML = ''
@@ -212,7 +194,6 @@ function renderTickers(){
     g.appendChild(d)
   })
 }
-
 function addTicker(){
   const v = document.getElementById('ticker-inp').value.trim().toUpperCase()
   if(!v || state.tickers.indexOf(v)>=0) return
@@ -220,166 +201,148 @@ function addTicker(){
   renderTickers()
   document.getElementById('ticker-inp').value = ''
 }
-document.addEventListener('keydown', function(e){
+document.addEventListener('keydown',function(e){
   if(e.key==='Enter' && document.activeElement.id==='ticker-inp') addTicker()
 })
-
 function renderScheds(){
   const el = document.getElementById('sched-list')
   el.innerHTML = ''
-  state.schedules.forEach(function(s, i){
+  state.schedules.forEach(function(s,i){
     const h = parseInt(s.time)
-    const icon = h<12 ? '🌅' : h<18 ? '🕐' : '🌙'
-
-    const row  = document.createElement('div')
+    const icon = h<12?'🌅':h<18?'🕐':'🌙'
+    const row = document.createElement('div')
     row.className = 'sched-item'
-
     const lbl = document.createElement('span')
     lbl.className = 'time-lbl'
     lbl.textContent = icon+' '+s.time
-
     const wrap = document.createElement('div')
     wrap.className = 'mini-wrap'
-
-    // สร้าง chip แต่ละตัวแยก — ไม่ใช้ template literal ใน onclick
-    var keys = ['chart','news','daily']
-    var labels = ['กราฟ','ข่าว','สรุป']
-    keys.forEach(function(key, ki){
+    var keys=['chart','news','daily'], labels=['กราฟ','ข่าว','สรุป']
+    keys.forEach(function(key,ki){
       const m = document.createElement('div')
-      m.className = 'mini' + (s[key] ? ' on' : '')
+      m.className = 'mini'+(s[key]?' on':'')
       m.textContent = labels[ki]
-      m.addEventListener('click', function(){
+      m.addEventListener('click',function(){
         state.schedules[i][key] = !state.schedules[i][key]
-        m.classList.toggle('on', state.schedules[i][key])
+        m.classList.toggle('on',state.schedules[i][key])
       })
       wrap.appendChild(m)
     })
-
     const btn = document.createElement('button')
     btn.className = 'del'
     btn.textContent = '🗑'
-    btn.addEventListener('click', function(){
-      state.schedules.splice(i, 1)
-      renderScheds()
-    })
-
-    row.appendChild(lbl)
-    row.appendChild(wrap)
-    row.appendChild(btn)
+    btn.addEventListener('click',function(){ state.schedules.splice(i,1); renderScheds() })
+    row.appendChild(lbl); row.appendChild(wrap); row.appendChild(btn)
     el.appendChild(row)
   })
 }
-
 function addSched(){
   const t = document.getElementById('new-time').value
   if(!t) return
   state.schedules.push({time:t,chart:true,news:true,daily:true})
   renderScheds()
 }
-
 function renderRecips(){
   const el = document.getElementById('recip-list')
   el.innerHTML = ''
-  state.recipients.forEach(function(r, i){
+  state.recipients.forEach(function(r,i){
     const row = document.createElement('div')
     row.className = 'recip-item'
     const masked = r.chat_id.length>4 ? r.chat_id.slice(0,-4)+'****' : r.chat_id
-
-    // info
+    // info — แสดง badge ถ้าใช้บอทต่างกัน
     const info = document.createElement('div')
-    const name = document.createElement('div')
-    name.className = 'recip-name'
-    name.textContent = r.name
-    const rid = document.createElement('div')
-    rid.className = 'recip-id'
-    rid.textContent = masked
-    info.appendChild(name)
-    info.appendChild(rid)
-
-    // switch — สร้างทุก element แยกกัน ไม่ใช้ innerHTML +=
+    const nm = document.createElement('div')
+    nm.className = 'recip-name'
+    nm.textContent = r.name
+    if(r.bot_token){
+      const tag = document.createElement('span')
+      tag.className = 'bot-tag'
+      tag.textContent = 'บอทของตัวเอง'
+      nm.appendChild(tag)
+    }
+    const rd = document.createElement('div')
+    rd.className = 'recip-id'
+    rd.textContent = masked
+    info.appendChild(nm); info.appendChild(rd)
+    // switch
     const sw = document.createElement('label')
     sw.className = 'sw'
     const chk = document.createElement('input')
     chk.type = 'checkbox'
     chk.checked = r.active === true
-    chk.addEventListener('change', function(){ state.recipients[i].active = chk.checked })
+    chk.addEventListener('change',function(){ state.recipients[i].active = chk.checked })
     const track = document.createElement('div')
     track.className = 'sw-track'
     const thumb = document.createElement('div')
     thumb.className = 'sw-thumb'
-    sw.appendChild(chk)
-    sw.appendChild(track)
-    sw.appendChild(thumb)
-
+    sw.appendChild(chk); sw.appendChild(track); sw.appendChild(thumb)
     // delete
     const del = document.createElement('button')
     del.className = 'del'
     del.textContent = '🗑'
-    del.addEventListener('click', function(){ delRecip(i) })
-
-    row.appendChild(info)
-    row.appendChild(sw)
-    row.appendChild(del)
+    del.addEventListener('click',function(){ delRecip(i) })
+    row.appendChild(info); row.appendChild(sw); row.appendChild(del)
     el.appendChild(row)
   })
 }
-
 async function delRecip(i){
   const r = state.recipients[i]
-  if(r.id){
-    await fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients?id=eq.'+r.id, {method:'DELETE',headers:hdr})
-  }
+  if(r.id) await fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients?id=eq.'+r.id,{method:'DELETE',headers:hdr})
   state.recipients.splice(i,1)
   renderRecips()
 }
-
 async function addRecip(){
   const name    = document.getElementById('rname').value.trim()
   const chat_id = document.getElementById('rid').value.trim()
+  const token   = document.getElementById('rtoken').value.trim()
   if(!name||!chat_id){ showToast('กรุณาใส่ชื่อและ Chat ID'); return }
   try {
+    const body = {name:name, chat_id:chat_id, active:true, bot_token:token}
     const res  = await fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients',
-      {method:'POST', headers:hdr, body:JSON.stringify({name:name,chat_id:chat_id,active:true})})
+      {method:'POST',headers:hdr,body:JSON.stringify(body)})
     const rows = await res.json()
-    state.recipients.push(rows[0] || {name:name,chat_id:chat_id,active:true})
+    state.recipients.push(rows[0] || body)
     renderRecips()
-    document.getElementById('rname').value = ''
-    document.getElementById('rid').value   = ''
+    document.getElementById('rname').value  = ''
+    document.getElementById('rid').value    = ''
+    document.getElementById('rtoken').value = ''
     showToast('เพิ่มผู้รับสำเร็จ ✓')
   } catch(e){ showToast('เพิ่มไม่ได้: '+e.message) }
 }
-
 function renderGemini(){
   document.querySelectorAll('#gemini-group .chip').forEach(function(c){
-    c.classList.toggle('on', !!state.gemini[c.dataset.v])
+    c.classList.toggle('on',!!state.gemini[c.dataset.v])
     c.onclick = function(){
       state.gemini[c.dataset.v] = !state.gemini[c.dataset.v]
-      c.classList.toggle('on', state.gemini[c.dataset.v])
+      c.classList.toggle('on',state.gemini[c.dataset.v])
     }
   })
 }
-
 async function testSend(){
   const btn = document.getElementById('test-btn')
   btn.textContent = '⏳ กำลังส่ง...'
   btn.disabled = true
-  const botToken    = state.bot_token || ''
+  const mainToken   = state.bot_token || ''
   const activeRecips = state.recipients.filter(function(r){ return r.active })
-  if(!botToken || activeRecips.length===0){
-    showToast('ไม่มีผู้รับหรือ Bot Token')
+  if(!mainToken && !activeRecips.some(function(r){ return r.bot_token })){
+    showToast('ไม่มี Bot Token')
     btn.textContent = '✉️ ทดสอบส่งให้ทุกคน'
     btn.disabled = false
     return
   }
   var ok = 0
   for(var ri=0; ri<activeRecips.length; ri++){
+    const r = activeRecips[ri]
+    // ใช้ bot_token ของผู้รับ ถ้าไม่มีใช้บอทหลัก
+    const token = (r.bot_token && r.bot_token.trim()) ? r.bot_token.trim() : mainToken
+    if(!token) continue
     try {
       const res = await fetch(
-        'https://api.telegram.org/bot'+botToken+'/sendMessage',
-        {method:'POST', headers:{'Content-Type':'application/json'},
+        'https://api.telegram.org/bot'+token+'/sendMessage',
+        {method:'POST',headers:{'Content-Type':'application/json'},
          body:JSON.stringify({
-           chat_id: activeRecips[ri].chat_id,
-           text: '✅ BOSWaves ทดสอบส่งสำเร็จ!\nผู้รับ: '+activeRecips[ri].name+'\nเวลา: '+new Date().toLocaleString('th-TH')
+           chat_id: r.chat_id,
+           text: '✅ BOSWaves ทดสอบส่งสำเร็จ!\nผู้รับ: '+r.name+'\nเวลา: '+new Date().toLocaleString('th-TH')
          })})
       if(res.ok) ok++
     } catch(e){}
@@ -388,46 +351,38 @@ async function testSend(){
   btn.textContent = '✉️ ทดสอบส่งให้ทุกคน'
   btn.disabled = false
 }
-
 async function saveConfig(){
   const btn = document.querySelector('.btn-save')
   btn.textContent = '💾 กำลังบันทึก...'
   btn.disabled = true
   try {
     const cfgBody = {
-      tickers:        state.tickers,
-      schedules:      state.schedules,
-      gemini:         state.gemini,
+      tickers: state.tickers, schedules: state.schedules, gemini: state.gemini,
       rsi_overbought: parseInt(document.getElementById('ob').value),
       rsi_oversold:   parseInt(document.getElementById('os').value),
-      updated_at:     new Date().toISOString()
+      updated_at: new Date().toISOString()
     }
     await fetch(SUPABASE_URL+'/rest/v1/boswaves_config?id=eq.1',
-      {method:'PATCH', headers:hdr, body:JSON.stringify(cfgBody)})
-
+      {method:'PATCH',headers:hdr,body:JSON.stringify(cfgBody)})
     for(var ri=0; ri<state.recipients.length; ri++){
       const r = state.recipients[ri]
       if(r.id){
         await fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients?id=eq.'+r.id,
-          {method:'PATCH', headers:hdr, body:JSON.stringify({active:r.active})})
+          {method:'PATCH',headers:hdr,body:JSON.stringify({active:r.active})})
       }
     }
     document.getElementById('save-status').textContent = 'บันทึกเมื่อ '+new Date().toLocaleTimeString('th-TH')
     showToast('บันทึกสำเร็จ ✓')
-  } catch(e){
-    showToast('บันทึกไม่ได้: '+e.message)
-  }
+  } catch(e){ showToast('บันทึกไม่ได้: '+e.message) }
   btn.textContent = '💾 บันทึกการตั้งค่า'
   btn.disabled = false
 }
-
 function showToast(msg){
   const t = document.getElementById('toast')
   t.textContent = msg
   t.style.display = 'block'
-  setTimeout(function(){ t.style.display='none' }, 3000)
+  setTimeout(function(){ t.style.display='none' },3000)
 }
-
 init()
 </script>
 </body>
