@@ -91,11 +91,59 @@ from matplotlib import font_manager
 from matplotlib.patches import Rectangle
 from matplotlib.lines import Line2D
 
+# ═══════════════════════════════════════════════════════════════════
+#  GEMINI — auto-detect model ที่ใช้งานได้จริง
+# ═══════════════════════════════════════════════════════════════════
+_gemini            = None
+_gemini_model_name = None
+_gemini_error      = None   # เก็บ error ไว้แจ้ง Telegram หลัง bot/chat พร้อม
+
+def _pick_gemini_model(preferred: list) -> str | None:
+    """เลือก model แรกที่มีอยู่จริงและรองรับ generateContent"""
+    try:
+        available = [
+            m.name.replace("models/", "")
+            for m in genai.list_models()
+            if "generateContent" in m.supported_generation_methods
+        ]
+        log.info(f"  Gemini models available: {available}")
+        for name in preferred:
+            if name in available:
+                log.info(f"  เลือก Gemini model: {name}")
+                return name
+        # fallback: เอาตัวแรกที่มีคำว่า "flash" และไม่ใช่ image/tts
+        flash = [m for m in available
+                 if "flash" in m and "image" not in m and "tts" not in m]
+        if flash:
+            log.info(f"  Gemini fallback model: {flash[0]}")
+            return flash[0]
+        log.warning("  ไม่พบ Gemini flash model เลย")
+    except Exception as e:
+        log.warning(f"  list_models error: {e}")
+        raise
+    return None
+
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    _gemini = genai.GenerativeModel("gemini-1.5-flash")
+    _MODEL_PRIORITY = [
+        "gemini-2.5-flash",
+        "gemini-3.1-flash-lite",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+    ]
+    try:
+        _gemini_model_name = _pick_gemini_model(_MODEL_PRIORITY)
+        if _gemini_model_name:
+            _gemini = genai.GenerativeModel(_gemini_model_name)
+        else:
+            _gemini_error = "ไม่พบ Gemini model ที่รองรับใน API"
+            log.warning(f"  {_gemini_error}")
+    except Exception as _e:
+        _gemini_error = f"Gemini API error ตอน init: {_e}"
+        log.warning(f"  {_gemini_error}")
 else:
-    _gemini = None
+    _gemini_error = "ไม่มี GEMINI_API_KEY"
 
 # ═══════════════════════════════════════════════════════════════════
 #  FONT SETUP
@@ -292,10 +340,12 @@ def fetch_yahoo_news(ticker: str, n: int = 3) -> list[str]:
 # ═══════════════════════════════════════════════════════════════════
 #  [+26] GEMINI — แปลและสรุปข่าว
 # ═══════════════════════════════════════════════════════════════════
-def translate_news_gemini(ticker: str, headlines: list[str]) -> list[str]:
-    """ส่งพาดหัวข่าวให้ Gemini แปลและสรุปเป็นภาษาไทยสั้นๆ"""
+def translate_news_gemini(ticker: str, headlines: list[str]) -> tuple[list[str], str | None]:
+    """ส่งพาดหัวข่าวให้ Gemini แปลและสรุปเป็นภาษาไทยสั้นๆ
+    คืน (รายการข่าว, error_message หรือ None ถ้าสำเร็จ)"""
     if not _gemini or not headlines:
-        return headlines  # fallback: คืนภาษาอังกฤษเดิม
+        err = _gemini_error or "ไม่มี Gemini / ไม่มีข่าว"
+        return headlines, err
 
     prompt = (
         f"ต่อไปนี้คือพาดหัวข่าวหุ้น {ticker} จาก Yahoo Finance "
@@ -309,15 +359,15 @@ def translate_news_gemini(ticker: str, headlines: list[str]) -> list[str]:
         resp  = _gemini.generate_content(prompt)
         lines = [l.strip() for l in resp.text.strip().splitlines()
                  if l.strip() and l.strip()[0].isdigit()]
-        # ตัด "1. " ออกเหลือแค่เนื้อหา
         cleaned = []
         for l in lines:
             parts = l.split(". ", 1)
             cleaned.append(parts[1] if len(parts) > 1 else l)
-        return cleaned if cleaned else headlines
+        return (cleaned if cleaned else headlines), None   # สำเร็จ
     except Exception as e:
-        log.warning(f"  gemini translate {ticker}: {e}")
-        return headlines  # fallback
+        err = f"Gemini translate error ({_gemini_model_name}): {e}"
+        log.warning(f"  {err}")
+        return headlines, err   # fallback + error
 
 # ═══════════════════════════════════════════════════════════════════
 #  TELEGRAM HELPERS
@@ -447,8 +497,19 @@ for ticker in TICKERS:
         log.info(f"  ดึงข่าว {ticker}...")
         headlines = fetch_yahoo_news(ticker, NEWS_PER_TICKER)
         log.info(f"  ได้ข่าว {len(headlines)} ข่าว")
-        news_th = translate_news_gemini(ticker, headlines)
-        log.info(f"  แปลข่าวเสร็จ")
+        news_th, gemini_err = translate_news_gemini(ticker, headlines)
+        if gemini_err:
+            log.warning(f"  Gemini ไม่ทำงาน: {gemini_err}")
+            # แจ้ง Telegram ว่า Gemini มีปัญหา (แจ้งแค่ ticker แรก ไม่แจ้งซ้ำ)
+            if ticker == TICKERS[0]:
+                tg_send_text(
+                    f"⚠️ <b>BOSWaves — Gemini API มีปัญหา</b>\n"
+                    f"📌 Model: <code>{_gemini_model_name or 'ไม่พบ'}</code>\n"
+                    f"❌ Error: <code>{gemini_err}</code>\n"
+                    f"📰 ข่าวจะแสดงเป็นภาษาอังกฤษแทน"
+                )
+        else:
+            log.info(f"  แปลข่าวเสร็จ (model: {_gemini_model_name})")
 
         close  = df['Close'].squeeze().values.astype(float)
         high   = df['High'].squeeze().values.astype(float)
