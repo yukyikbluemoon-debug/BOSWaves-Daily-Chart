@@ -414,54 +414,84 @@ def tg_send_text(text: str) -> None:
 #  [+30][+31][+32] DAILY SUMMARY — ส่งก่อน BOSWaves
 # ═══════════════════════════════════════════════════════════════════
 def build_daily_chart(ticker_data: dict, date_str: str) -> Path | None:
-    """3 กราฟ simple line รวมในรูปเดียว"""
+    """2 กราฟ — บนราคาจริง / ล่าง normalized"""
     try:
-        fig, axes = plt.subplots(3, 1, figsize=(10, 9),
-                                 facecolor='#0B0E14')
-        fig.subplots_adjust(hspace=0.35, top=0.93, bottom=0.06,
-                            left=0.08, right=0.97)
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(11, 9),
+                                        facecolor='#0B0E14')
+        fig.subplots_adjust(hspace=0.40, top=0.92, bottom=0.07,
+                            left=0.09, right=0.95)
         colors = {'VOO': '#3ECF8E', 'NVDA': '#F97316', 'JEPQ': '#60A5FA'}
 
-        for ax, ticker in zip(axes, ["VOO", "NVDA", "JEPQ"]):
-            df  = ticker_data.get(ticker)
+        for ax in [ax1, ax2]:
             ax.set_facecolor('#0B0E14')
-            if df is None:
-                ax.text(0.5, 0.5, f'{ticker}: ไม่มีข้อมูล',
-                        ha='center', va='center', color='white',
-                        transform=ax.transAxes)
-                continue
-
-            closes = df['Close'].squeeze().values.astype(float)
-            dates  = mdates.date2num(df.index)
-            col    = colors.get(ticker, '#FFFFFF')
-
-            ax.plot(dates, closes, color=col, linewidth=1.4)
-            ax.fill_between(dates, closes, closes.min(),
-                            alpha=0.08, color=col)
-
-            last  = closes[-1]
-            prev  = closes[-2] if len(closes) >= 2 else last
-            chg   = (last - prev) / prev * 100
-            arrow = "▲" if chg >= 0 else "▼"
-            chg_c = '#3ECF8E' if chg >= 0 else '#FF5A5A'
-
-            ax.set_title(
-                f'{ticker}   ${last:.2f}  {arrow} {abs(chg):.2f}%',
-                color=col, fontsize=10, fontweight='bold',
-                loc='left', pad=4)
-            ax.tick_params(colors='#888888', labelsize=7)
-            ax.grid(True, alpha=0.07, linestyle='--')
+            ax.grid(True, alpha=0.08, linestyle='--')
+            ax.tick_params(colors='#888888', labelsize=8)
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %y'))
             for spine in ax.spines.values():
                 spine.set_edgecolor('#333333')
-            ax.annotate(f'${last:.2f}',
-                        xy=(dates[-1], last),
-                        xytext=(5, 0), textcoords='offset points',
-                        color=chg_c, fontsize=8, va='center')
+
+        # ── กราฟบน: ราคาจริง ──────────────────────────────────
+        for ticker in ["VOO", "NVDA", "JEPQ"]:
+            df = ticker_data.get(ticker)
+            if df is None:
+                continue
+            closes    = df['Close'].squeeze().values.astype(float)
+            dates_num = mdates.date2num(df.index)
+            col       = colors[ticker]
+            last      = closes[-1]
+            prev      = closes[-2] if len(closes) >= 2 else last
+            chg       = (last - prev) / prev * 100
+            sign      = '+' if chg >= 0 else ''
+
+            ax1.plot(dates_num, closes, color=col, linewidth=1.5,
+                     label=f'{ticker}  ${last:.2f} ({sign}{chg:.2f}%)')
+            ax1.annotate(f'${last:.2f}',
+                         xy=(dates_num[-1], last),
+                         xytext=(6, 0), textcoords='offset points',
+                         color=col, fontsize=9, fontweight='bold', va='center')
+
+        ax1.set_title('ราคาจริง (USD)', color='white',
+                      fontsize=10, fontweight='bold', loc='left', pad=6)
+        ax1.set_ylabel('ราคา (USD)', color='white', fontsize=8)
+        ax1.legend(facecolor='#1A1F2B', edgecolor='#444444',
+                   labelcolor='white', fontsize=9, loc='upper left')
+
+        # ── กราฟล่าง: Normalized ──────────────────────────────
+        ax2.axhline(100, color='#555555', linestyle='--',
+                    linewidth=0.9, alpha=0.7)
+
+        for ticker in ["VOO", "NVDA", "JEPQ"]:
+            df = ticker_data.get(ticker)
+            if df is None:
+                continue
+            closes    = df['Close'].squeeze().values.astype(float)
+            dates_num = mdates.date2num(df.index)
+            col       = colors[ticker]
+            norm      = closes / closes[0] * 100
+            last_n    = norm[-1]
+            chg       = last_n - 100
+            sign      = '+' if chg >= 0 else ''
+
+            ax2.plot(dates_num, norm, color=col, linewidth=1.8,
+                     label=f'{ticker}  {sign}{chg:.1f}%')
+            ax2.fill_between(dates_num, 100, norm,
+                             alpha=0.08, color=col)
+            ax2.annotate(f'{sign}{chg:.1f}%',
+                         xy=(dates_num[-1], last_n),
+                         xytext=(6, 0), textcoords='offset points',
+                         color=col, fontsize=10,
+                         fontweight='bold', va='center')
+
+        ax2.set_title('Normalized — % การเติบโตเปรียบเทียบ (เริ่มต้น = 100)',
+                      color='white', fontsize=10,
+                      fontweight='bold', loc='left', pad=6)
+        ax2.set_ylabel('ผลตอบแทน (base=100)', color='white', fontsize=8)
+        ax2.legend(facecolor='#1A1F2B', edgecolor='#444444',
+                   labelcolor='white', fontsize=9, loc='upper left')
 
         fig.suptitle(f'Daily Summary — {now_str}',
                      color='white', fontsize=11, fontweight='bold')
-        # [+33] ชื่อไฟล์มีวันที่
+
         out = OUTPUT_DIR / f"daily_summary_{date_str}.png"
         fig.savefig(str(out), dpi=110, facecolor='#0B0E14',
                     edgecolor='none', bbox_inches='tight')
