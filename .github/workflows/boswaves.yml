@@ -2,11 +2,10 @@ name: BOSWaves Daily Chart
 
 on:
   schedule:
-    # รันทุกวัน 08:00 เวลาไทย = 01:00 UTC
-    # (วันจันทร์-ศุกร์เท่านั้น — ตลาดสหรัฐฯ ปิดเสาร์-อาทิตย์)
-    - cron: '0 1 * * 1-5'
-
-  # กดรันมือได้จาก GitHub UI
+    - cron: '0 1 * * 1-5'    # 08:00 ไทย
+    - cron: '0 8 * * 1-5'    # 15:00 ไทย
+    - cron: '0 20 * * 1-5'   # 03:00 ไทย (วันถัดไป)
+    - cron: '0 3 * * 6'      # 10:00 ไทย เสาร์ (ทดสอบ)
   workflow_dispatch:
 
 jobs:
@@ -15,37 +14,32 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      # 1. โหลดโค้ดจาก repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. ติดตั้ง Python
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
-      # 3. ติดตั้ง Thai font สำหรับ matplotlib บน Linux
       - name: Install Thai fonts
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y fonts-thai-tlwg fonts-dejavu
           fc-cache -fv
 
-      # 4. ติดตั้ง Python packages
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      # 5. รันสคริปต์ — Secrets จาก GitHub Settings
       - name: Run BOSWaves
         env:
           TELEGRAM_TOKEN:    ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID:  ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: python create_boswaves_v8.py
 
-      # 6. (optional) เก็บรูปและ log ไว้ดูใน Actions artifacts
       - name: Upload output artifacts
         if: always()
         uses: actions/upload-artifact@v4
