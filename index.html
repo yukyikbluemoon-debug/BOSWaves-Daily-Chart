@@ -366,8 +366,11 @@ async function saveConfig(){
       rsi_oversold:   parseInt(document.getElementById('os').value),
       updated_at:     new Date().toISOString()
     }
-    await fetch(`${SUPABASE_URL}/rest/v1/boswaves_config?id=eq.1`,
-      {method:'PATCH', headers:hdr, body: JSON.stringify(cfgBody)})
+    const patchRes = await fetch(`${SUPABASE_URL}/rest/v1/boswaves_config?id=eq.1`,
+  {method:'PATCH', headers:hdr, body: JSON.stringify(cfgBody)})
+console.log('PATCH status:', patchRes.status)
+const patchBody = await patchRes.text()
+console.log('PATCH body:', patchBody)
 
     // อัปเดต recipients active status
     for(const r of state.recipients){
