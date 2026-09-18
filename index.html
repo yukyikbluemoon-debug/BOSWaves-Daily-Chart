@@ -182,6 +182,7 @@ async function init(){
       state.gemini         = c.gemini         || state.gemini
       state.rsi_overbought = c.rsi_overbought || 70
       state.rsi_oversold   = c.rsi_oversold   || 30
+      state.bot_token = c.bot_token || ''
     }
     state.recipients = recRows || []
     document.getElementById('conn-status').textContent = '🟢 เชื่อมต่อแล้ว'
@@ -317,9 +318,37 @@ async function testSend(){
   const btn = document.getElementById('test-btn')
   btn.textContent = '⏳ กำลังส่ง...'
   btn.disabled = true
-  await new Promise(r=>setTimeout(r,1500))
-  btn.textContent = '✅ ส่งสำเร็จ'
-  setTimeout(()=>{ btn.textContent = '✉️ ทดสอบส่งให้ทุกคน'; btn.disabled=false }, 2000)
+
+  const botToken = state.bot_token || ''
+  const activeRecips = state.recipients.filter(r => r.active)
+
+  if(!botToken || activeRecips.length === 0){
+    showToast('ไม่มีผู้รับหรือ Bot Token')
+    btn.textContent = '✉️ ทดสอบส่งให้ทุกคน'
+    btn.disabled = false
+    return
+  }
+
+  let ok = 0
+  for(const r of activeRecips){
+    try {
+      const res = await fetch(
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
+        { method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            chat_id: r.chat_id,
+            text: `✅ BOSWaves ทดสอบส่งสำเร็จ!\nผู้รับ: ${r.name}\nเวลา: ${new Date().toLocaleString('th-TH')}`
+          })
+        }
+      )
+      if(res.ok) ok++
+    } catch(e){}
+  }
+
+  showToast(ok > 0 ? `ส่งสำเร็จ ${ok}/${activeRecips.length} คน ✓` : 'ส่งไม่ได้ ตรวจสอบ Token')
+  btn.textContent = '✉️ ทดสอบส่งให้ทุกคน'
+  btn.disabled = false
 }
 
 async function saveConfig(){
