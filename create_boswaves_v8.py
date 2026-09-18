@@ -1,27 +1,19 @@
 """
-BOSWaves Swing Structure Forecast Chart — v8 (News + Market Context Edition)
-─────────────────────────────────────────────────────────────────────────────
-เพิ่มจาก v7.1:
-  [+23] ข่าว Yahoo Finance RSS (ฟรี ไม่ต้อง key)
-  [+24] Fear & Greed Index จาก CNN API
-  [+25] VIX + S&P500 % วันนี้ (yfinance)
-  [+26] แปลและสรุปข่าวเป็นไทยด้วย Gemini API (gemini-1.5-flash)
-  [+27] caption Telegram รวม market context + ข่าวแปลไทย
-
-.env ที่ต้องมี:
-  BOT_TOKEN=...
-  CHAT_ID=...
-  GEMINI_API_KEY=...
+BOSWaves Swing Structure Forecast Chart — v8.2
+───────────────────────────────────────────────
+เพิ่มจาก v8.1:
+  [+30] ส่ง Daily Summary ก่อน แล้วค่อย BOSWaves
+  [+31] ลดข้อมูลซ้ำใน caption BOSWaves (ตัด market context ออก)
+  [+32] แจ้งเตือน RSI overbought/oversold ใน caption
+  [+33] ชื่อไฟล์มีวันที่ เช่น VOO_BOSWaves_20260918.png
+  [+34] Gemini auto-detect model
 """
 
-import os, sys, time, logging, warnings
+import os, sys, time, logging, warnings, json, urllib.request
 import numpy as np
 from pathlib import Path
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
-
-# ⚠️ อย่า hardcode token ที่นี่ — ใช้ .env หรือ GitHub Secrets เท่านั้น
-
 
 warnings.filterwarnings("ignore", category=FutureWarning,      module="yfinance")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="urllib3")
@@ -50,7 +42,7 @@ LOG_DIR           = OUTPUT_DIR / "logs"
 DOWNLOAD_RETRIES  = 3
 DOWNLOAD_DELAY    = 5
 TG_TIMEOUT        = 30
-NEWS_PER_TICKER   = 3          # จำนวนข่าวต่อ ticker
+NEWS_PER_TICKER   = 3
 
 # ═══════════════════════════════════════════════════════════════════
 #  LOGGING
@@ -69,9 +61,8 @@ log.setLevel(logging.DEBUG)
 log.addHandler(_fh)
 log.addHandler(_ch)
 
-# guard
 if not BOT_TOKEN or not CHAT_ID:
-    log.error("BOT_TOKEN หรือ CHAT_ID ไม่พบใน .env — ยกเลิก")
+    log.error("TELEGRAM_TOKEN หรือ TELEGRAM_CHAT_ID ไม่พบใน .env — ยกเลิก")
     sys.exit(1)
 if not GEMINI_API_KEY:
     log.warning("GEMINI_API_KEY ไม่พบ — จะข้ามการแปลข่าว")
@@ -88,14 +79,61 @@ from matplotlib import font_manager
 from matplotlib.patches import Rectangle
 from matplotlib.lines import Line2D
 
+# ═══════════════════════════════════════════════════════════════════
+#  GEMINI — auto-detect model
+# ═══════════════════════════════════════════════════════════════════
+_gemini            = None
+_gemini_model_name = None
+_gemini_error      = None
+
+def _pick_gemini_model(preferred: list) -> str | None:
+    try:
+        available = [
+            m.name.replace("models/", "")
+            for m in genai.list_models()
+            if "generateContent" in m.supported_generation_methods
+        ]
+        log.info(f"  Gemini models available: {available}")
+        for name in preferred:
+            if name in available:
+                log.info(f"  เลือก Gemini model: {name}")
+                return name
+        flash = [m for m in available
+                 if "flash" in m and "image" not in m and "tts" not in m]
+        if flash:
+            log.info(f"  Gemini fallback model: {flash[0]}")
+            return flash[0]
+        log.warning("  ไม่พบ Gemini flash model เลย")
+    except Exception as e:
+        log.warning(f"  list_models error: {e}")
+        raise
+    return None
+
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    _gemini = genai.GenerativeModel("gemini-3.6-flash")
+    _MODEL_PRIORITY = [
+        "gemini-3.6-flash",
+        "gemini-2.5-flash",
+        "gemini-3.1-flash-lite",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+    ]
+    try:
+        _gemini_model_name = _pick_gemini_model(_MODEL_PRIORITY)
+        if _gemini_model_name:
+            _gemini = genai.GenerativeModel(_gemini_model_name)
+        else:
+            _gemini_error = "ไม่พบ Gemini model ที่รองรับใน API"
+            log.warning(f"  {_gemini_error}")
+    except Exception as _e:
+        _gemini_error = f"Gemini API error ตอน init: {_e}"
+        log.warning(f"  {_gemini_error}")
 else:
-    _gemini = None
+    _gemini_error = "ไม่มี GEMINI_API_KEY"
 
 # ═══════════════════════════════════════════════════════════════════
-#  FONT SETUP
+#  FONT SETUP — รองรับ Windows และ Linux
 # ═══════════════════════════════════════════════════════════════════
 _FONT_CANDIDATES = [
     (r"C:\Windows\Fonts\tahomabd.ttf", "Tahoma"),
@@ -104,6 +142,9 @@ _FONT_CANDIDATES = [
     (r"C:\Windows\Fonts\leelawad.ttf", "Leelawadee UI"),
     (r"C:\Windows\Fonts\angsa.ttf",    "Angsana New"),
     (r"C:\Windows\Fonts\angsab.ttf",   "Angsana New"),
+    ("/usr/share/fonts/truetype/tlwg/Garuda.ttf",       "Garuda"),
+    ("/usr/share/fonts/truetype/tlwg/Loma.ttf",         "Loma"),
+    ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "DejaVu Sans"),
 ]
 _loaded_families = []
 for _fp, _fm in _FONT_CANDIDATES:
@@ -128,7 +169,8 @@ def compute_atr(high, low, close, period=14):
     n = len(high); tr = np.empty(n)
     tr[0] = high[0] - low[0]
     for i in range(1, n):
-        tr[i] = max(high[i]-low[i], abs(high[i]-close[i-1]), abs(low[i]-close[i-1]))
+        tr[i] = max(high[i]-low[i], abs(high[i]-close[i-1]),
+                    abs(low[i]-close[i-1]))
     atr = np.empty(n); atr[0] = tr[0]
     for i in range(1, n):
         atr[i] = (atr[i-1]*(period-1) + tr[i]) / period
@@ -174,7 +216,8 @@ def trend_bias(close, ema50, ema200, rsi):
 def download_with_retry(ticker, period, retries=3, delay=5):
     for attempt in range(1, retries+1):
         try:
-            df = yf.download(ticker, period=period, progress=False, auto_adjust=True)
+            df = yf.download(ticker, period=period, progress=False,
+                             auto_adjust=True)
             df = df[~df.index.duplicated(keep='first')].dropna()
             if not df.empty:
                 return df
@@ -206,7 +249,7 @@ def fetch_extra_info(ticker: str) -> dict:
     return defaults
 
 # ═══════════════════════════════════════════════════════════════════
-#  [+24] FEAR & GREED INDEX
+#  FEAR & GREED
 # ═══════════════════════════════════════════════════════════════════
 def fetch_fear_greed() -> dict:
     result = {"value": None, "label_th": "N/A"}
@@ -218,20 +261,15 @@ def fetch_fear_greed() -> dict:
         elif val <= 75: return "โลภ 😏"
         else:           return "โลภมาก 🤑"
 
-    # แหล่งที่ 1: alternative.me
     try:
         r   = requests.get("https://api.alternative.me/fng/",
-                           timeout=8,
-                           headers={"User-Agent": "Mozilla/5.0"})
+                           timeout=8, headers={"User-Agent": "Mozilla/5.0"})
         val = int(r.json()["data"][0]["value"])
         result["value"]    = val
         result["label_th"] = _label_th(val)
-        log.info(f"  Fear&Greed: {val} ({result['label_th']})")
         return result
     except Exception as e:
         log.warning(f"  fear_greed alternative.me: {e}")
-
-    # fallback: CNN
     try:
         r   = requests.get(
                 "https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
@@ -241,29 +279,26 @@ def fetch_fear_greed() -> dict:
         result["label_th"] = _label_th(val)
     except Exception as e:
         log.warning(f"  fear_greed CNN: {e}")
-
     return result
 
 # ═══════════════════════════════════════════════════════════════════
-#  [+25] VIX + S&P500
+#  VIX + S&P500 + USD/THB
 # ═══════════════════════════════════════════════════════════════════
 def fetch_market_context() -> dict:
-    """ดึง VIX, S&P500 และ USD/THB"""
-    result = {"vix": None, "sp500_chg": None, "sp500_last": None, "usdthb": None}
+    result = {"vix": None, "sp500_chg": None,
+              "sp500_last": None, "usdthb": None}
     try:
         vix_data = yf.download("^VIX", period="2d", progress=False,
                                auto_adjust=True)
         if not vix_data.empty:
             result["vix"] = round(float(
                 vix_data['Close'].squeeze().iloc[-1]), 2)
-
         sp_data = yf.download("^GSPC", period="2d", progress=False,
                               auto_adjust=True)
         if len(sp_data) >= 2:
             c = sp_data['Close'].squeeze().values
             result["sp500_last"] = round(float(c[-1]), 2)
             result["sp500_chg"]  = round((c[-1] - c[-2]) / c[-2] * 100, 2)
-
         thb_data = yf.download("THB=X", period="2d", progress=False,
                                auto_adjust=True)
         if not thb_data.empty:
@@ -274,13 +309,11 @@ def fetch_market_context() -> dict:
     return result
 
 # ═══════════════════════════════════════════════════════════════════
-#  [+28] GOLD PRICE — XAU/USD จาก gold-api.com
+#  GOLD PRICE
 # ═══════════════════════════════════════════════════════════════════
 def fetch_gold_price() -> dict:
-    """ดึงราคาทองคำ XAU/USD"""
     result = {"price": None, "change_pct": None}
     try:
-        import urllib.request, json
         req = urllib.request.Request(
             "https://api.gold-api.com/price/XAU",
             headers={"User-Agent": "Mozilla/5.0"}
@@ -292,20 +325,22 @@ def fetch_gold_price() -> dict:
             if price:
                 result["price"] = float(price)
             if price and prev and float(prev) != 0:
-                result["change_pct"] = (float(price) - float(prev)) / float(prev) * 100
-        log.info(f"  Gold: ${result['price']:,.2f}" if result["price"] else "  Gold: N/A")
+                result["change_pct"] = (
+                    (float(price) - float(prev)) / float(prev) * 100)
+        log.info(f"  Gold: ${result['price']:,.2f}"
+                 if result["price"] else "  Gold: N/A")
     except Exception as e:
         log.warning(f"  gold_price error: {e}")
     return result
 
 # ═══════════════════════════════════════════════════════════════════
-#  [+23] Yahoo Finance RSS
+#  Yahoo Finance RSS
 # ═══════════════════════════════════════════════════════════════════
 def fetch_yahoo_news(ticker: str, n: int = 3) -> list[str]:
-    """ดึงพาดหัวข่าวล่าสุด n ข่าวจาก Yahoo Finance RSS"""
     headlines = []
     try:
-        url  = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={ticker}&region=US&lang=en-US"
+        url  = (f"https://feeds.finance.yahoo.com/rss/2.0/headline"
+                f"?s={ticker}&region=US&lang=en-US")
         feed = feedparser.parse(url)
         for entry in feed.entries[:n]:
             headlines.append(entry.title.strip())
@@ -314,119 +349,13 @@ def fetch_yahoo_news(ticker: str, n: int = 3) -> list[str]:
     return headlines
 
 # ═══════════════════════════════════════════════════════════════════
-#  [+29] DAILY REPORT — chart 3 กราฟรวม + caption สั้น
+#  GEMINI — แปลข่าว
 # ═══════════════════════════════════════════════════════════════════
-def build_daily_chart(ticker_data: dict) -> Path | None:
-    """สร้างรูป 3 กราฟ simple line VOO/NVDA/JEPQ รวมในรูปเดียว"""
-    try:
-        fig, axes = plt.subplots(3, 1, figsize=(10, 9),
-                                 facecolor='#0B0E14')
-        fig.subplots_adjust(hspace=0.35, top=0.93, bottom=0.06,
-                            left=0.08, right=0.97)
-        colors = {'VOO': '#3ECF8E', 'NVDA': '#F97316', 'JEPQ': '#60A5FA'}
-
-        for ax, ticker in zip(axes, ["VOO", "NVDA", "JEPQ"]):
-            df = ticker_data.get(ticker)
-            ax.set_facecolor('#0B0E14')
-            if df is None:
-                ax.text(0.5, 0.5, f'{ticker}: ไม่มีข้อมูล',
-                        ha='center', va='center', color='white',
-                        transform=ax.transAxes)
-                continue
-
-            closes = df['Close'].squeeze().values.astype(float)
-            dates  = mdates.date2num(df.index)
-            col    = colors.get(ticker, '#FFFFFF')
-
-            ax.plot(dates, closes, color=col, linewidth=1.4)
-            ax.fill_between(dates, closes, closes.min(),
-                            alpha=0.08, color=col)
-
-            last  = closes[-1]
-            prev  = closes[-2] if len(closes) >= 2 else last
-            chg   = (last - prev) / prev * 100
-            arrow = "▲" if chg >= 0 else "▼"
-            chg_c = '#3ECF8E' if chg >= 0 else '#FF5A5A'
-
-            ax.set_title(
-                f'{ticker}   ${last:.2f}  {arrow} {abs(chg):.2f}%',
-                color=col, fontsize=10, fontweight='bold', loc='left', pad=4)
-            ax.tick_params(colors='#888888', labelsize=7)
-            ax.grid(True, alpha=0.07, linestyle='--')
-            ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %y'))
-            for spine in ax.spines.values():
-                spine.set_edgecolor('#333333')
-
-            # ไฮไลต์ราคาล่าสุด
-            ax.annotate(f'${last:.2f}',
-                        xy=(dates[-1], last),
-                        xytext=(5, 0), textcoords='offset points',
-                        color=chg_c, fontsize=8, va='center')
-
-        fig.suptitle(f'Daily Summary — {now_str}',
-                     color='white', fontsize=11, fontweight='bold')
-        out = OUTPUT_DIR / "daily_summary.png"
-        fig.savefig(str(out), dpi=110, facecolor='#0B0E14',
-                    edgecolor='none', bbox_inches='tight')
-        plt.close(fig)
-        log.info("  Daily chart บันทึกสำเร็จ")
-        return out
-    except Exception as e:
-        log.error(f"  Daily chart error: {e}")
-        return None
-
-def build_daily_caption(ticker_data: dict, market_ctx: dict,
-                         fear_greed: dict, gold: dict) -> str:
-    """caption สั้น สรุปราคา + market"""
-    lines = [f"<b>📊 Daily Summary — {now_str}</b>\n"]
-
-    for ticker in ["VOO", "NVDA", "JEPQ"]:
-        df = ticker_data.get(ticker)
-        if df is None:
-            lines.append(f"{ticker}  N/A")
-            continue
-        closes = df['Close'].squeeze().values.astype(float)
-        last   = closes[-1]
-        prev   = closes[-2] if len(closes) >= 2 else last
-        chg    = (last - prev) / prev * 100
-        arrow  = "▲" if chg >= 0 else "▼"
-        lines.append(f"<b>{ticker}</b>  ${last:.2f}  {arrow} {abs(chg):.2f}%")
-
-    lines.append("━━━━━━━━━━━━━━━━")
-
-    sp_chg  = market_ctx.get("sp500_chg")
-    sp_last = market_ctx.get("sp500_last")
-    vix     = market_ctx.get("vix")
-    usdthb  = market_ctx.get("usdthb")
-
-    sp_str  = (f"${sp_last:,.2f} ({'+' if (sp_chg or 0)>=0 else ''}{sp_chg:.2f}%)"
-               if sp_last else "N/A")
-    vix_str = f"{vix:.1f}" if vix else "N/A"
-    thb_str = f"{usdthb:.2f}" if usdthb else "N/A"
-
-    fg_val   = fear_greed.get("value")
-    fg_label = fear_greed.get("label_th", "N/A")
-    fg_str   = f"{fg_val:.0f} ({fg_label})" if fg_val is not None else "N/A"
-
-    gold_p   = gold.get("price")
-    gold_str = f"${gold_p:,.2f}" if gold_p else "N/A"
-
-    lines.append(f"🌍 S&P500: {sp_str}  |  VIX: {vix_str}")
-    lines.append(f"😱 Fear&Greed: {fg_str}")
-    lines.append(f"🥇 ทองคำ: {gold_str}")
-    lines.append(f"💱 USD/THB: {thb_str}")
-    lines.append("\n<i>⚠️ ไม่ใช่คำแนะนำทางการเงิน</i>")
-
-    return "\n".join(lines)
-
-# ═══════════════════════════════════════════════════════════════════
-#  [+26] GEMINI — แปลและสรุปข่าว
-# ═══════════════════════════════════════════════════════════════════
-def translate_news_gemini(ticker: str, headlines: list[str]) -> list[str]:
-    """ส่งพาดหัวข่าวให้ Gemini แปลและสรุปเป็นภาษาไทยสั้นๆ"""
+def translate_news_gemini(ticker: str,
+                          headlines: list[str]) -> tuple[list[str], str | None]:
     if not _gemini or not headlines:
-        return headlines  # fallback: คืนภาษาอังกฤษเดิม
-
+        err = _gemini_error or "ไม่มี Gemini / ไม่มีข่าว"
+        return headlines, err
     prompt = (
         f"ต่อไปนี้คือพาดหัวข่าวหุ้น {ticker} จาก Yahoo Finance "
         f"จำนวน {len(headlines)} ข่าว\n\n"
@@ -439,18 +368,18 @@ def translate_news_gemini(ticker: str, headlines: list[str]) -> list[str]:
         resp  = _gemini.generate_content(prompt)
         lines = [l.strip() for l in resp.text.strip().splitlines()
                  if l.strip() and l.strip()[0].isdigit()]
-        # ตัด "1. " ออกเหลือแค่เนื้อหา
         cleaned = []
         for l in lines:
             parts = l.split(". ", 1)
             cleaned.append(parts[1] if len(parts) > 1 else l)
-        return cleaned if cleaned else headlines
+        return (cleaned if cleaned else headlines), None
     except Exception as e:
-        log.warning(f"  gemini translate {ticker}: {e}")
-        return headlines  # fallback
+        err = f"Gemini translate error ({_gemini_model_name}): {e}"
+        log.warning(f"  {err}")
+        return headlines, err
 
 # ═══════════════════════════════════════════════════════════════════
-#  TELEGRAM HELPERS
+#  TELEGRAM
 # ═══════════════════════════════════════════════════════════════════
 def tg_send_photo(image_path: Path, caption: str) -> bool:
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
@@ -481,11 +410,131 @@ def tg_send_text(text: str) -> None:
     except Exception:
         pass
 
-# ── [+27] build_caption ───────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════
+#  [+30][+31][+32] DAILY SUMMARY — ส่งก่อน BOSWaves
+# ═══════════════════════════════════════════════════════════════════
+def build_daily_chart(ticker_data: dict, date_str: str) -> Path | None:
+    """3 กราฟ simple line รวมในรูปเดียว"""
+    try:
+        fig, axes = plt.subplots(3, 1, figsize=(10, 9),
+                                 facecolor='#0B0E14')
+        fig.subplots_adjust(hspace=0.35, top=0.93, bottom=0.06,
+                            left=0.08, right=0.97)
+        colors = {'VOO': '#3ECF8E', 'NVDA': '#F97316', 'JEPQ': '#60A5FA'}
+
+        for ax, ticker in zip(axes, ["VOO", "NVDA", "JEPQ"]):
+            df  = ticker_data.get(ticker)
+            ax.set_facecolor('#0B0E14')
+            if df is None:
+                ax.text(0.5, 0.5, f'{ticker}: ไม่มีข้อมูล',
+                        ha='center', va='center', color='white',
+                        transform=ax.transAxes)
+                continue
+
+            closes = df['Close'].squeeze().values.astype(float)
+            dates  = mdates.date2num(df.index)
+            col    = colors.get(ticker, '#FFFFFF')
+
+            ax.plot(dates, closes, color=col, linewidth=1.4)
+            ax.fill_between(dates, closes, closes.min(),
+                            alpha=0.08, color=col)
+
+            last  = closes[-1]
+            prev  = closes[-2] if len(closes) >= 2 else last
+            chg   = (last - prev) / prev * 100
+            arrow = "▲" if chg >= 0 else "▼"
+            chg_c = '#3ECF8E' if chg >= 0 else '#FF5A5A'
+
+            ax.set_title(
+                f'{ticker}   ${last:.2f}  {arrow} {abs(chg):.2f}%',
+                color=col, fontsize=10, fontweight='bold',
+                loc='left', pad=4)
+            ax.tick_params(colors='#888888', labelsize=7)
+            ax.grid(True, alpha=0.07, linestyle='--')
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %y'))
+            for spine in ax.spines.values():
+                spine.set_edgecolor('#333333')
+            ax.annotate(f'${last:.2f}',
+                        xy=(dates[-1], last),
+                        xytext=(5, 0), textcoords='offset points',
+                        color=chg_c, fontsize=8, va='center')
+
+        fig.suptitle(f'Daily Summary — {now_str}',
+                     color='white', fontsize=11, fontweight='bold')
+        # [+33] ชื่อไฟล์มีวันที่
+        out = OUTPUT_DIR / f"daily_summary_{date_str}.png"
+        fig.savefig(str(out), dpi=110, facecolor='#0B0E14',
+                    edgecolor='none', bbox_inches='tight')
+        plt.close(fig)
+        log.info(f"  Daily chart บันทึกสำเร็จ: {out.name}")
+        return out
+    except Exception as e:
+        log.error(f"  Daily chart error: {e}")
+        return None
+
+def build_daily_caption(ticker_data: dict, market_ctx: dict,
+                        fear_greed: dict, gold: dict) -> str:
+    lines = [f"<b>📊 Daily Summary — {now_str}</b>\n"]
+
+    for ticker in ["VOO", "NVDA", "JEPQ"]:
+        df = ticker_data.get(ticker)
+        if df is None:
+            lines.append(f"{ticker}  N/A")
+            continue
+        closes = df['Close'].squeeze().values.astype(float)
+        last   = closes[-1]
+        prev   = closes[-2] if len(closes) >= 2 else last
+        chg    = (last - prev) / prev * 100
+        arrow  = "▲" if chg >= 0 else "▼"
+
+        # [+32] แจ้งเตือน RSI ใน daily caption ด้วย
+        rsi_now = compute_rsi(closes)[-1]
+        rsi_tag = ""
+        if rsi_now >= 70:
+            rsi_tag = f"  🔥 RSI {rsi_now:.0f} Overbought"
+        elif rsi_now <= 30:
+            rsi_tag = f"  💎 RSI {rsi_now:.0f} Oversold"
+
+        lines.append(
+            f"<b>{ticker}</b>  ${last:.2f}  {arrow} {abs(chg):.2f}%{rsi_tag}")
+
+    lines.append("━━━━━━━━━━━━━━━━")
+
+    sp_chg  = market_ctx.get("sp500_chg")
+    sp_last = market_ctx.get("sp500_last")
+    vix     = market_ctx.get("vix")
+    usdthb  = market_ctx.get("usdthb")
+    sp_str  = (f"${sp_last:,.2f} "
+               f"({'+' if (sp_chg or 0) >= 0 else ''}{sp_chg:.2f}%)"
+               if sp_last else "N/A")
+    vix_str = f"{vix:.1f}" if vix else "N/A"
+    thb_str = f"{usdthb:.2f}" if usdthb else "N/A"
+
+    fg_val   = fear_greed.get("value")
+    fg_label = fear_greed.get("label_th", "N/A")
+    fg_str   = (f"{fg_val:.0f} ({fg_label})"
+                if fg_val is not None else "N/A")
+
+    gold_p   = gold.get("price")
+    gold_chg = gold.get("change_pct")
+    gold_str = f"${gold_p:,.2f}" if gold_p else "N/A"
+    gold_chg_str = (f" (+{gold_chg:.2f}%)" if gold_chg and gold_chg >= 0
+                    else f" ({gold_chg:.2f}%)" if gold_chg else "")
+
+    lines.append(f"🌍 S&P500: {sp_str}  |  VIX: {vix_str}")
+    lines.append(f"😱 Fear&Greed: {fg_str}")
+    lines.append(f"🥇 ทองคำ: {gold_str}{gold_chg_str}")
+    lines.append(f"💱 USD/THB: {thb_str}")
+    lines.append("\n<i>⚠️ ไม่ใช่คำแนะนำทางการเงิน</i>")
+    return "\n".join(lines)
+
+# ═══════════════════════════════════════════════════════════════════
+#  [+31] BUILD CAPTION BOSWaves — ตัด market context ออก
+#         เน้นเฉพาะข้อมูลของ ticker + RSI alert + ข่าว + entry/sl/tp
+# ═══════════════════════════════════════════════════════════════════
 def build_caption(ticker, close_price, bias_label,
                   rsi, atr, entry, sl, tp, rr,
-                  extra, fear_greed, market_ctx,
-                  news_th: list[str]) -> str:
+                  extra, news_th: list[str]) -> str:
 
     bias_tag = ("🟢" if bias_label == "BULLISH" else
                 "🔴" if bias_label == "BEARISH" else "🟡")
@@ -499,24 +548,21 @@ def build_caption(ticker, close_price, bias_label,
 
     w52h = extra.get("week52_high")
     w52l = extra.get("week52_low")
-    w52_str  = (f"${w52l:.2f} – ${w52h:.2f}" if w52h and w52l else "N/A")
+    w52_str = (f"${w52l:.2f} – ${w52h:.2f}"
+               if w52h and w52l else "N/A")
 
     dy = extra.get("div_yield")
     dy_str = f"{dy*100:.2f}%" if dy else "–"
 
-    # Fear & Greed
-    fg_val   = fear_greed.get("value")
-    fg_label = fear_greed.get("label_th", "N/A")
-    fg_str   = f"{fg_val:.0f} ({fg_label})" if fg_val is not None else "N/A"
+    # [+32] RSI alert
+    if rsi >= 70:
+        rsi_str = f"🔥 <b>{rsi:.1f} Overbought!</b>"
+    elif rsi <= 30:
+        rsi_str = f"💎 <b>{rsi:.1f} Oversold!</b>"
+    else:
+        rsi_str = f"{rsi:.1f}"
 
-    # Market
-    sp_chg = market_ctx.get("sp500_chg")
-    sp_str = (f"+{sp_chg:.2f}%" if sp_chg and sp_chg >= 0
-              else f"{sp_chg:.2f}%" if sp_chg is not None else "N/A")
-    vix    = market_ctx.get("vix")
-    vix_str = f"{vix:.1f}" if vix else "N/A"
-
-    # News
+    # ข่าว
     news_block = ""
     if news_th:
         lines = "\n".join(f"• {h}" for h in news_th)
@@ -527,10 +573,7 @@ def build_caption(ticker, close_price, bias_label,
         f"{bias_tag} {bias_th}  |  ราคา: <b>${close_price:.2f}</b>\n"
         f"{chg_icon} วันนี้: <b>{chg_str}</b>  |  ปันผล: {dy_str}\n"
         f"📊 52w: {w52_str}\n"
-        f"RSI: {rsi:.1f}  |  ATR: ${atr:.2f}\n"
-        f"━━━━━━━━━━━━━━━━\n"
-        f"🌍 ตลาด: S&P500 {sp_str}  |  VIX {vix_str}\n"
-        f"😱 Fear&Greed: {fg_str}\n"
+        f"RSI: {rsi_str}  |  ATR: ${atr:.2f}\n"
         f"{news_block}"
         f"━━━━━━━━━━━━━━━━\n"
         f"📌 เข้าซื้อ: <b>${entry:.2f}</b>\n"
@@ -544,46 +587,83 @@ def build_caption(ticker, close_price, bias_label,
 #  MAIN
 # ═══════════════════════════════════════════════════════════════════
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-now_str   = datetime.now().strftime("%d/%m/%Y %H:%M")
+now_str  = datetime.now().strftime("%d/%m/%Y %H:%M")
+date_str = datetime.now().strftime("%Y%m%d")   # [+33] ใช้ตั้งชื่อไฟล์
 run_start = datetime.now()
 failed    = []
 
 log.info("=" * 55)
-log.info(f"BOSWaves v8 เริ่มทำงาน — {now_str}")
+log.info(f"BOSWaves v8.2 เริ่มทำงาน — {now_str}")
 log.info(f"tickers: {TICKERS}")
 
-# ── ดึงข้อมูลตลาดรวม (ดึงครั้งเดียว ใช้ทุก ticker) ────────────
 log.info("ดึงข้อมูลตลาดรวม...")
-fear_greed  = fetch_fear_greed()
-market_ctx  = fetch_market_context()
-gold        = fetch_gold_price()
+fear_greed = fetch_fear_greed()
+market_ctx = fetch_market_context()
+gold       = fetch_gold_price()
 log.info(f"  Fear&Greed: {fear_greed}")
 log.info(f"  Market: {market_ctx}")
 log.info(f"  Gold: {gold}")
 
-ticker_df = {}   # เก็บ df ไว้ใช้ตอนสร้าง daily chart
+# ── ดาวน์โหลดข้อมูลทุก ticker ก่อน (เก็บใน ticker_df) ───────────
+ticker_df = {}
+log.info("ดาวน์โหลดข้อมูลราคา...")
+for ticker in TICKERS:
+    df = download_with_retry(ticker, DATA_PERIOD,
+                             DOWNLOAD_RETRIES, DOWNLOAD_DELAY)
+    if df is not None:
+        ticker_df[ticker] = df
+        log.info(f"  {ticker}: {len(df)} bars")
+    else:
+        log.error(f"  {ticker}: download ล้มเหลว")
+        failed.append(ticker)
+        tg_send_text(
+            f"⚠️ <b>BOSWaves cronjob error</b>\n{ticker}: download ล้มเหลว")
+
+# ═══════════════════════════════════════════════════════════════════
+#  [+30] ส่ง DAILY SUMMARY ก่อน
+# ═══════════════════════════════════════════════════════════════════
+log.info("--- Daily Summary Chart ---")
+try:
+    daily_out = build_daily_chart(ticker_df, date_str)
+    if daily_out:
+        daily_cap = build_daily_caption(ticker_df, market_ctx,
+                                        fear_greed, gold)
+        ok = tg_send_photo(daily_out, daily_cap)
+        log.info("  ✓ Daily chart ส่งสำเร็จ" if ok
+                 else "  ✗ Daily chart ส่งล้มเหลว")
+    else:
+        log.error("  ✗ Daily chart สร้างรูปล้มเหลว")
+except Exception as e:
+    log.error(f"  Daily chart error: {e}")
+    tg_send_text(f"⚠️ <b>BOSWaves — Daily Chart error</b>\n{e}")
+
+# ═══════════════════════════════════════════════════════════════════
+#  BOSWaves — วิเคราะห์แต่ละ ticker
+# ═══════════════════════════════════════════════════════════════════
+gemini_notified = False   # แจ้ง Gemini error แค่ครั้งเดียว
 
 for ticker in TICKERS:
+    if ticker in failed:
+        continue
     log.info(f"--- {ticker} ---")
     t0 = datetime.now()
 
     try:
-        # Download price
-        df = download_with_retry(ticker, DATA_PERIOD,
-                                 DOWNLOAD_RETRIES, DOWNLOAD_DELAY)
-        if df is None:
-            raise ValueError(f"download ล้มเหลวทุก {DOWNLOAD_RETRIES} attempt")
-        log.info(f"  download OK — {len(df)} bars")
-        ticker_df[ticker] = df   # เก็บไว้ใช้ daily chart
-
+        df    = ticker_df[ticker]
         extra = fetch_extra_info(ticker)
 
-        # [+23][+26] ข่าว + แปลด้วย Gemini
-        log.info(f"  ดึงข่าว {ticker}...")
+        # ข่าว + Gemini แปล
+        log.info(f"  ดึงข่าว...")
         headlines = fetch_yahoo_news(ticker, NEWS_PER_TICKER)
-        log.info(f"  ได้ข่าว {len(headlines)} ข่าว")
-        news_th = translate_news_gemini(ticker, headlines)
-        log.info(f"  แปลข่าวเสร็จ")
+        news_th, gemini_err = translate_news_gemini(ticker, headlines)
+        if gemini_err and not gemini_notified:
+            tg_send_text(
+                f"⚠️ <b>BOSWaves — Gemini API มีปัญหา</b>\n"
+                f"📌 Model: <code>{_gemini_model_name or 'ไม่พบ'}</code>\n"
+                f"❌ Error: <code>{gemini_err}</code>\n"
+                f"📰 ข่าวจะแสดงเป็นภาษาอังกฤษแทน"
+            )
+            gemini_notified = True
 
         close  = df['Close'].squeeze().values.astype(float)
         high   = df['High'].squeeze().values.astype(float)
@@ -595,7 +675,8 @@ for ticker in TICKERS:
         bar_w  = float(np.diff(dates_num).mean()) if n > 1 else 1.0
 
         atr_period_safe = min(ATR_PERIOD, n // 2)
-        current_atr     = float(compute_atr(high, low, close, atr_period_safe)[-1])
+        current_atr     = float(
+            compute_atr(high, low, close, atr_period_safe)[-1])
         rsi_vals        = compute_rsi(close, 14)
         ema50           = compute_ema(close, EMA_SHORT)
         ema200          = compute_ema(close, EMA_LONG)
@@ -607,9 +688,10 @@ for ticker in TICKERS:
         pivot_highs = [(i, float(high[i])) for i in range(n) if swing_high[i]]
         pivot_lows  = [(i, float(low[i]))  for i in range(n) if swing_low[i]]
 
-        # ── Figure ────────────────────────────────────────────────
+        # ── Figure ──────────────────────────────────────────────
         fig = plt.figure(figsize=(14, 12))
-        gs  = fig.add_gridspec(3, 1, height_ratios=[3.0, 0.8, 0.8], hspace=0.18)
+        gs  = fig.add_gridspec(3, 1, height_ratios=[3.0, 0.8, 0.8],
+                               hspace=0.18)
         ax     = fig.add_subplot(gs[0])
         ax_rsi = fig.add_subplot(gs[1], sharex=ax)
         ax_vol = fig.add_subplot(gs[2], sharex=ax)
@@ -623,18 +705,20 @@ for ticker in TICKERS:
         for p_idx, p_price in (pivot_lows[-3:] if pivot_lows else []):
             d_s = dates_num[max(0, p_idx-5)]
             d_w = max(bar_w, dates_num[min(n-1, p_idx+5)] - d_s)
-            ax.add_patch(Rectangle((d_s, p_price - ZONE_WIDTH_FACTOR*current_atr),
-                                   d_w, ZONE_WIDTH_FACTOR*current_atr*2,
-                                   facecolor='#3ECF8E', alpha=0.20,
-                                   edgecolor='#3ECF8E', linewidth=0.8, zorder=2))
+            ax.add_patch(Rectangle(
+                (d_s, p_price - ZONE_WIDTH_FACTOR*current_atr),
+                d_w, ZONE_WIDTH_FACTOR*current_atr*2,
+                facecolor='#3ECF8E', alpha=0.20,
+                edgecolor='#3ECF8E', linewidth=0.8, zorder=2))
 
         for p_idx, p_price in (pivot_highs[-3:] if pivot_highs else []):
             d_s = dates_num[max(0, p_idx-5)]
             d_w = max(bar_w, dates_num[min(n-1, p_idx+5)] - d_s)
-            ax.add_patch(Rectangle((d_s, p_price - ZONE_WIDTH_FACTOR*current_atr),
-                                   d_w, ZONE_WIDTH_FACTOR*current_atr*2,
-                                   facecolor='#FF5A5A', alpha=0.20,
-                                   edgecolor='#FF5A5A', linewidth=0.8, zorder=2))
+            ax.add_patch(Rectangle(
+                (d_s, p_price - ZONE_WIDTH_FACTOR*current_atr),
+                d_w, ZONE_WIDTH_FACTOR*current_atr*2,
+                facecolor='#FF5A5A', alpha=0.20,
+                edgecolor='#FF5A5A', linewidth=0.8, zorder=2))
 
         for idx, price in pivot_highs[-6:]:
             ax.scatter(dates_num[idx], price, color='#FF5A5A', s=45,
@@ -657,10 +741,13 @@ for ticker in TICKERS:
         if pivot_highs:
             last_ph = pivot_highs[-1]
             xmax    = dates_num[-1] + bar_w * 10
-            ax.hlines(y=last_ph[1], xmin=dates_num[last_ph[0]], xmax=xmax,
-                      color='#FF5A5A', linestyle='--', linewidth=0.8, alpha=0.7)
+            ax.hlines(y=last_ph[1],
+                      xmin=dates_num[last_ph[0]], xmax=xmax,
+                      color='#FF5A5A', linestyle='--',
+                      linewidth=0.8, alpha=0.7)
             ax.text(dates_num[-1] + bar_w*1.5, last_ph[1],
-                    ' แนวต้าน BOS', color='#FF5A5A', fontsize=8, va='center')
+                    ' แนวต้าน BOS',
+                    color='#FF5A5A', fontsize=8, va='center')
 
         entry_price = sl_price = tp_price = rr_ratio = None
         if pivot_lows and pivot_highs:
@@ -680,18 +767,22 @@ for ticker in TICKERS:
             entry_price = fib_low + 0.1 * current_atr
             sl_price    = fib_low - 1.5 * current_atr
             tp_price    = fib_high
-            rr_ratio    = (tp_price - entry_price) / max(0.01, entry_price - sl_price)
+            rr_ratio    = ((tp_price - entry_price) /
+                           max(0.01, entry_price - sl_price))
 
-        ax.text(dates_num[-1], close[-1], f' ปัจจุบัน ${close[-1]:.2f}',
+        ax.text(dates_num[-1], close[-1],
+                f' ปัจจุบัน ${close[-1]:.2f}',
                 color='white', fontsize=10, fontweight='bold', va='center',
                 bbox=dict(boxstyle='round,pad=0.3', facecolor='#1A1F2B',
                           edgecolor='#3ECF8E'))
 
         panel_text = (
             f"  [{ticker}  สรุปโครงสร้าง]\n"
-            f"  ราคา: ${close[-1]:.2f}   ATR({atr_period_safe}): ${current_atr:.2f}\n"
+            f"  ราคา: ${close[-1]:.2f}   "
+            f"ATR({atr_period_safe}): ${current_atr:.2f}\n"
             f"  RSI: {rsi_vals[-1]:.1f}   "
-            f"EMA{EMA_SHORT}: ${ema50[-1]:.2f}   EMA{EMA_LONG}: ${ema200[-1]:.2f}\n"
+            f"EMA{EMA_SHORT}: ${ema50[-1]:.2f}   "
+            f"EMA{EMA_LONG}: ${ema200[-1]:.2f}\n"
             f"  แนวโน้ม: {bias_icon} {bias_label}"
         )
         ax.text(0.015, 0.97, panel_text,
@@ -705,11 +796,14 @@ for ticker in TICKERS:
                       edgecolor='#3ECF8E', label='โซนแนวรับ (Demand)'),
             Rectangle((0,0),1,1, facecolor='#FF5A5A', alpha=0.25,
                       edgecolor='#FF5A5A', label='โซนแนวต้าน (Supply)'),
-            Line2D([0],[0], marker='^', color='w', markerfacecolor='#3ECF8E',
-                   markersize=7, label='Pivot Low'),
-            Line2D([0],[0], marker='v', color='w', markerfacecolor='#FF5A5A',
-                   markersize=7, label='Pivot High'),
-            Line2D([0],[0], color='#F6C90E', linewidth=1.2, label=f'EMA {EMA_SHORT}'),
+            Line2D([0],[0], marker='^', color='w',
+                   markerfacecolor='#3ECF8E', markersize=7,
+                   label='Pivot Low'),
+            Line2D([0],[0], marker='v', color='w',
+                   markerfacecolor='#FF5A5A', markersize=7,
+                   label='Pivot High'),
+            Line2D([0],[0], color='#F6C90E', linewidth=1.2,
+                   label=f'EMA {EMA_SHORT}'),
             Line2D([0],[0], color='#60A5FA', linewidth=1.2,
                    linestyle='--', label=f'EMA {EMA_LONG}'),
         ]
@@ -724,9 +818,11 @@ for ticker in TICKERS:
         ax_rsi.axhline(50, color='#888888', linestyle=':', alpha=0.3)
         ax_rsi.axhline(30, color='#3ECF8E', linestyle=':', alpha=0.5)
         ax_rsi.fill_between(dates_num, rsi_vals, 70,
-                            where=(rsi_vals >= 70), color='#FF5A5A', alpha=0.25)
+                            where=(rsi_vals >= 70),
+                            color='#FF5A5A', alpha=0.25)
         ax_rsi.fill_between(dates_num, rsi_vals, 30,
-                            where=(rsi_vals <= 30), color='#3ECF8E', alpha=0.25)
+                            where=(rsi_vals <= 30),
+                            color='#3ECF8E', alpha=0.25)
         ax_rsi.text(dates_num[0], 72, ' Overbought > 70',
                     color='#FF5A5A', fontsize=7.5)
         ax_rsi.text(dates_num[0], 22, ' Oversold < 30',
@@ -737,7 +833,8 @@ for ticker in TICKERS:
         ax_rsi.grid(True, alpha=0.07, linestyle='--')
 
         vol_colors = np.where(
-            np.concatenate(([0], np.diff(close))) >= 0, '#3ECF8E', '#FF5A5A')
+            np.concatenate(([0], np.diff(close))) >= 0,
+            '#3ECF8E', '#FF5A5A')
         ax_vol.bar(dates_num, volume, width=bar_w*0.8,
                    color=vol_colors, alpha=0.7)
         ax_vol.plot(dates_num, compute_ema(volume, 20),
@@ -747,10 +844,11 @@ for ticker in TICKERS:
         ax_vol.grid(True, alpha=0.07, linestyle='--')
         ax_vol.yaxis.set_major_formatter(
             matplotlib.ticker.FuncFormatter(
-                lambda x, _: f'{x/1e6:.1f}M' if x >= 1e6 else f'{x/1e3:.0f}K'))
+                lambda x, _: (f'{x/1e6:.1f}M'
+                              if x >= 1e6 else f'{x/1e3:.0f}K')))
 
         ax.set_title(
-            f'{ticker} — โครงสร้างราคาและทิศทางแนวโน้ม (BOSWaves v8)',
+            f'{ticker} — โครงสร้างราคาและทิศทางแนวโน้ม (BOSWaves v8.2)',
             color='white', fontsize=13, fontweight='bold', pad=12)
         ax.text(0.998, 0.995, f'สร้างเมื่อ {now_str}',
                 transform=ax.transAxes, fontsize=7, color='#777777',
@@ -768,9 +866,11 @@ for ticker in TICKERS:
         if entry_price is not None:
             footer = (
                 f"[แผนการเทรด {ticker}]  "
-                f"Entry: ${entry_price:.2f}   |   SL: ${sl_price:.2f}   |   "
+                f"Entry: ${entry_price:.2f}   |   "
+                f"SL: ${sl_price:.2f}   |   "
                 f"TP: ${tp_price:.2f}  (R:R = 1:{rr_ratio:.1f})\n"
-                f"คำเตือน: หากราคาหลุด ${sl_price:.2f} โครงสร้างขาขึ้นสิ้นสุด"
+                f"คำเตือน: หากราคาหลุด ${sl_price:.2f} "
+                f"โครงสร้างขาขึ้นสิ้นสุด"
             )
         else:
             footer = f"[{ticker}]: ข้อมูลไม่เพียงพอสำหรับสร้างแผนการเทรด"
@@ -782,24 +882,25 @@ for ticker in TICKERS:
                            edgecolor='#3ECF8E', alpha=0.95))
         fig.text(0.98, 0.007,
                  "* การวิเคราะห์นี้สร้างจากอัลกอริทึมทางเทคนิค "
-                 "ไม่ใช่คำแนะนำทางการเงิน ผู้ลงทุนควรบริหารความเสี่ยงด้วยตนเอง",
+                 "ไม่ใช่คำแนะนำทางการเงิน "
+                 "ผู้ลงทุนควรบริหารความเสี่ยงด้วยตนเอง",
                  ha='right', va='bottom', fontsize=7, color='#555555')
 
         fig.subplots_adjust(bottom=0.12)
-        out = OUTPUT_DIR / f"{ticker}_BOSWaves_v8.png"
+        # [+33] ชื่อไฟล์มีวันที่
+        out = OUTPUT_DIR / f"{ticker}_BOSWaves_{date_str}.png"
         plt.savefig(str(out), dpi=120, facecolor='#0B0E14',
                     edgecolor='none', bbox_inches='tight')
         plt.close(fig)
         log.info(f"  บันทึกรูปสำเร็จ: {out.name}")
 
-        # ── ส่ง Telegram ──────────────────────────────────────────
+        # ส่ง Telegram — caption ไม่มี market context แล้ว [+31]
         caption = build_caption(
             ticker, close[-1], bias_label,
             rsi_vals[-1], current_atr,
             entry_price, sl_price, tp_price, rr_ratio,
-            extra, fear_greed, market_ctx, news_th)
+            extra, news_th)
 
-        log.info(f"  ส่ง Telegram...")
         ok = tg_send_photo(out, caption)
         if ok:
             elapsed = (datetime.now() - t0).seconds
@@ -810,26 +911,8 @@ for ticker in TICKERS:
     except Exception as exc:
         log.error(f"  ✗ {ticker} ล้มเหลว: {exc}")
         failed.append(ticker)
-        tg_send_text(f"⚠️ <b>BOSWaves cronjob error</b>\n{ticker}: {exc}")
-
-# ═══════════════════════════════════════════════════════════════════
-#  [+29] DAILY CHART — ส่งหลัง BOSWaves ครบทุก ticker
-# ═══════════════════════════════════════════════════════════════════
-log.info("--- Daily Summary Chart ---")
-try:
-    daily_out = build_daily_chart(ticker_df)
-    if daily_out:
-        daily_cap = build_daily_caption(ticker_df, market_ctx, fear_greed, gold)
-        ok = tg_send_photo(daily_out, daily_cap)
-        if ok:
-            log.info("  ✓ Daily chart ส่ง Telegram สำเร็จ")
-        else:
-            log.error("  ✗ Daily chart ส่ง Telegram ล้มเหลว")
-    else:
-        log.error("  ✗ Daily chart สร้างรูปล้มเหลว")
-except Exception as e:
-    log.error(f"  ✗ Daily chart error: {e}")
-    tg_send_text(f"⚠️ <b>BOSWaves — Daily Chart error</b>\n{e}")
+        tg_send_text(
+            f"⚠️ <b>BOSWaves cronjob error</b>\n{ticker}: {exc}")
 
 # ═══════════════════════════════════════════════════════════════════
 #  RUN SUMMARY
