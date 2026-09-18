@@ -285,18 +285,33 @@ function renderRecips(){
     row.className = 'recip-item'
     const masked = r.chat_id.length>4 ? r.chat_id.slice(0,-4)+'****' : r.chat_id
 
+    // info
     const info = document.createElement('div')
-    info.innerHTML = '<div class="recip-name">'+r.name+'</div><div class="recip-id">'+masked+'</div>'
+    const name = document.createElement('div')
+    name.className = 'recip-name'
+    name.textContent = r.name
+    const rid = document.createElement('div')
+    rid.className = 'recip-id'
+    rid.textContent = masked
+    info.appendChild(name)
+    info.appendChild(rid)
 
+    // switch — สร้างทุก element แยกกัน ไม่ใช้ innerHTML +=
     const sw = document.createElement('label')
     sw.className = 'sw'
     const chk = document.createElement('input')
     chk.type = 'checkbox'
-    chk.checked = !!r.active
+    chk.checked = r.active === true
     chk.addEventListener('change', function(){ state.recipients[i].active = chk.checked })
+    const track = document.createElement('div')
+    track.className = 'sw-track'
+    const thumb = document.createElement('div')
+    thumb.className = 'sw-thumb'
     sw.appendChild(chk)
-    sw.innerHTML += '<div class="sw-track"></div><div class="sw-thumb"></div>'
+    sw.appendChild(track)
+    sw.appendChild(thumb)
 
+    // delete
     const del = document.createElement('button')
     del.className = 'del'
     del.textContent = '🗑'
