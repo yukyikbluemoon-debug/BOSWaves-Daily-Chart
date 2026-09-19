@@ -431,6 +431,11 @@ def tg_send_photo(image_path: Path, caption: str) -> bool:
     ok_count = 0
     cap = caption[:1020]+'…' if len(caption)>1024 else caption
     log.info(f"  caption length: {len(caption)} → {len(cap)}")
+    # ตรวจสอบ HTML tag ที่ Telegram รองรับ
+    import re as _re
+    allowed = r'<(/?(b|i|u|s|code|pre|a))(\s[^>]*)?>|&[a-z]+;'
+    # แทนที่ tag ที่ไม่รองรับด้วยช่องว่าง
+    cap = _re.sub(r'<(?!/?(?:b|i|u|s|code|pre|a)(?:\s[^>]*)?>)[^>]+>', '', cap)  
     for r in RECIPIENTS:
         token = (r.get("bot_token") or "").strip() or MAIN_BOT_TOKEN
         cid   = r["chat_id"]
