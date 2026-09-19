@@ -38,6 +38,9 @@ jobs:
           GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
           SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SEND_CHART = os.getenv("SEND_CHART", "true").lower() == "true"
+          SEND_NEWS  = os.getenv("SEND_NEWS",  "true").lower() == "true"
+          SEND_DAILY = os.getenv("SEND_DAILY", "true").lower() == "true"
         run: python create_boswaves_v8.py
 
       - name: Upload output artifacts
