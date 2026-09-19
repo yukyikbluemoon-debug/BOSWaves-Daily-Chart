@@ -2,11 +2,21 @@ name: BOSWaves Daily Chart
 
 on:
   schedule:
-    - cron: '0 1 * * 1-5'    # 08:00 ไทย
-    - cron: '0 8 * * 1-5'    # 15:00 ไทย
-    - cron: '0 20 * * 1-5'   # 03:00 ไทย (วันถัดไป)
-    - cron: '0 3 * * 6'      # 10:00 ไทย เสาร์ (ทดสอบ)
+    - cron: '0 1 * * 1-5'
+    - cron: '0 8 * * 1-5'
+    - cron: '0 20 * * 1-5'
+    - cron: '0 3 * * 6'
   workflow_dispatch:
+    inputs:
+      send_chart:
+        description: 'ส่งกราฟ'
+        default: 'true'
+      send_news:
+        description: 'ส่งข่าว'
+        default: 'true'
+      send_daily:
+        description: 'ส่ง Daily Summary'
+        default: 'true'
 
 jobs:
   run-boswaves:
@@ -38,9 +48,9 @@ jobs:
           GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
           SUPABASE_URL:      ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SEND_CHART = os.getenv("SEND_CHART", "true").lower() == "true"
-          SEND_NEWS  = os.getenv("SEND_NEWS",  "true").lower() == "true"
-          SEND_DAILY = os.getenv("SEND_DAILY", "true").lower() == "true"
+          SEND_CHART:        ${{ github.event.inputs.send_chart || 'true' }}
+          SEND_NEWS:         ${{ github.event.inputs.send_news  || 'true' }}
+          SEND_DAILY:        ${{ github.event.inputs.send_daily || 'true' }}
         run: python create_boswaves_v8.py
 
       - name: Upload output artifacts
