@@ -667,6 +667,7 @@ def build_caption(ticker, close_price, bias_label, rsi, atr,
         f"📊 52w: {w52_str}\n"
         f"RSI: {_rsi_label(rsi)}  |  ATR: ${atr:.2f}\n"
         f"{news_block}"
+        f"{assess_block}" 
         f"━━━━━━━━━━━━━━━━\n"
         f"📌 เข้าซื้อ: <b>${entry:.2f}</b>\n"
         f"🛑 ตัดขาดทุน: <b>${sl:.2f}</b>\n"
