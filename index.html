@@ -399,25 +399,40 @@ function addSched(){
 }
 
 async function testSchedSend(i, btn){
-  btn.textContent='⏳'; btn.disabled=true
-  const mainToken=state.bot_token||''
-  const activeRecips=state.recipients.filter(function(r){ return r.active })
-  var ok=0
-  for(var ri=0;ri<activeRecips.length;ri++){
-    const r=activeRecips[ri]
-    const token=(r.bot_token&&r.bot_token.trim())?r.bot_token.trim():mainToken
-    if(!token) continue
-    try {
-      const res=await fetch('https://api.telegram.org/bot'+token+'/sendMessage',
-        {method:'POST',headers:{'Content-Type':'application/json'},
-         body:JSON.stringify({
-           chat_id:r.chat_id,
-           text:'📤 ทดสอบรอบ '+state.schedules[i].time+'\nผู้รับ: '+r.name+'\nเวลา: '+new Date().toLocaleString('th-TH')
-         })})
-      if(res.ok) ok++
-    } catch(e){}
-  }
-  showToast(ok>0?'ส่งสำเร็จ '+ok+' คน ✓':'ส่งไม่ได้')
+  btn.textContent='⏳ กำลังรัน...'; btn.disabled=true
+  try {
+    // ดึง github token จาก Supabase
+    const cfgRes = await fetch(SUPABASE_URL+'/rest/v1/boswaves_config?id=eq.1&select=github_token',{headers:hdr})
+    const cfg = (await cfgRes.json())[0] || {}
+    const ghToken = cfg.github_token || ''
+    if(!ghToken){ showToast('ไม่มี GitHub Token ใน config'); btn.textContent='📤 ทดสอบ'; btn.disabled=false; return }
+
+    const s = state.schedules[i]
+    const res = await fetch(
+      'https://api.github.com/repos/yukyikbluemoon-debug/BOSWaves-Daily-Chart/actions/workflows/boswaves.yml/dispatches',
+      { method:'POST',
+        headers:{
+          'Authorization':'Bearer '+ghToken,
+          'Accept':'application/vnd.github+json',
+          'Content-Type':'application/json'
+        },
+        body: JSON.stringify({
+          ref:'main',
+          inputs:{
+            send_chart: s.chart  ? 'true':'false',
+            send_news:  s.news   ? 'true':'false',
+            send_daily: s.daily  ? 'true':'false'
+          }
+        })
+      }
+    )
+    if(res.ok || res.status===204){
+      showToast('✅ รันสำเร็จ! รอดู Telegram ~1 นาที')
+    } else {
+      const err = await res.text()
+      showToast('❌ รันไม่ได้: '+res.status+' '+err.slice(0,60))
+    }
+  } catch(e){ showToast('❌ Error: '+e.message) }
   btn.textContent='📤 ทดสอบ'; btn.disabled=false
 }
 
