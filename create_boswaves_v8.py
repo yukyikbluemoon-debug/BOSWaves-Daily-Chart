@@ -598,7 +598,7 @@ def build_daily_caption(ticker_data: dict, market_ctx: dict,
         rsi_now = compute_rsi(closes)[-1]
         rsi_tag = _rsi_tag_short(rsi_now)
         lines.append(f"<b>{ticker}</b>  ${last:.2f}  {arrow} {abs(chg):.2f}%{rsi_tag}")
-    lines.append("━━━━━━━━━━━━━━━━")
+    lines.append("—————————————")
     sp_chg  = market_ctx.get("sp500_chg"); sp_last = market_ctx.get("sp500_last")
     vix     = market_ctx.get("vix");       usdthb  = market_ctx.get("usdthb")
     sp_str  = (f"${sp_last:,.2f} ({'+' if (sp_chg or 0)>=0 else ''}{sp_chg:.2f}%)" if sp_last else "N/A")
@@ -632,7 +632,7 @@ def build_caption(ticker, close_price, bias_label, rsi, atr,
     dy = extra.get("div_yield"); dy_str = f"{dy*100:.2f}%" if dy else "–"
     news_block = ""
     if news_th:
-        news_block = "━━━━━━━━━━━━━━━━\n📰 ข่าวล่าสุด:\n" + "\n".join(f"• {h}" for h in news_th) + "\n"
+        news_block = "—————————————\n📰 ข่าวล่าสุด:\n" + "\n".join(f"• {h}" for h in news_th) + "\n"
 
     # [+42] ประเมินสถานการณ์ rule-based
     score = 0
@@ -659,7 +659,7 @@ def build_caption(ticker, close_price, bias_label, rsi, atr,
     else:               rec = "🟡 รอดู — ถือหรือสังเกตก่อน"
 
     assess_block = (
-        f"━━━━━━━━━━━━━━━━\n"
+        f"—————————————\n"
         f"🎲 ประเมินสถานการณ์\n"
         f"📈 โอกาสขึ้น: <b>{up_pct}%</b>\n"
         f"📉 โอกาสลง: <b>{down_pct}%</b>\n"
@@ -675,11 +675,11 @@ def build_caption(ticker, close_price, bias_label, rsi, atr,
         f"RSI: {_rsi_label(rsi)}  |  ATR: ${atr:.2f}\n"
         f"{news_block}"
         f"{assess_block}" 
-        f"━━━━━━━━━━━━━━━━\n"
+        f"—————————————\n"
         f"📌 เข้าซื้อ: <b>${entry:.2f}</b>\n"
         f"🛑 ตัดขาดทุน: <b>${sl:.2f}</b>\n"
         f"🎯 เป้ากำไร: <b>${tp:.2f}</b>  (R:R 1:{rr:.1f})\n"
-        f"━━━━━━━━━━━━━━━━\n"
+        f"—————————————\n"
         f"<i>⚠️ ไม่ใช่คำแนะนำทางการเงิน</i>\n"
         f"<i>⚠️ RSI — ถ้า > 70 มักปรับตัวลง, < 30 มักเด้งขึ้น</i>\n"
     )
