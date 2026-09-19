@@ -125,6 +125,11 @@ MAIN_BOT_TOKEN = _cfg.get("bot_token") or BOT_TOKEN
 # ═══════════════════════════════════════════════════════════════════
 #  CONFIGURATION (ค่าคงที่)
 # ═══════════════════════════════════════════════════════════════════
+# [+41] รับ inputs จาก GitHub Actions workflow_dispatch
+SEND_CHART = os.getenv("SEND_CHART", "true").lower() == "true"
+SEND_NEWS  = os.getenv("SEND_NEWS",  "true").lower() == "true"
+SEND_DAILY = os.getenv("SEND_DAILY", "true").lower() == "true"
+
 DATA_PERIOD       = "1y"
 SWING_LENGTH      = 16
 ATR_PERIOD        = 14
@@ -138,9 +143,6 @@ DOWNLOAD_RETRIES  = 3
 DOWNLOAD_DELAY    = 5
 TG_TIMEOUT        = 30
 NEWS_PER_TICKER   = 3
-SEND_CHART = os.getenv("SEND_CHART", "true").lower() == "true"
-SEND_NEWS  = os.getenv("SEND_NEWS",  "true").lower() == "true"
-SEND_DAILY = os.getenv("SEND_DAILY", "true").lower() == "true"
 
 # ═══════════════════════════════════════════════════════════════════
 #  LOGGING
@@ -725,15 +727,18 @@ send_weekly_summary(ticker_df)
 process_watchlist()
 
 # ── Daily Summary ───────────────────────────────────────────────
-log.info("--- Daily Summary ---")
-try:
-    daily_out = build_daily_chart(ticker_df, date_str)
-    if daily_out:
-        ok = tg_send_photo(daily_out, build_daily_caption(ticker_df, market_ctx, fear_greed, gold))
-        log.info("  ✓ Daily chart ส่งสำเร็จ" if ok else "  ✗ Daily chart ส่งล้มเหลว")
-except Exception as e:
-    log.error(f"  Daily chart: {e}")
-    tg_send_text(f"⚠️ <b>Daily Chart error</b>\n{e}")
+if SEND_DAILY:
+    log.info("--- Daily Summary ---")
+    try:
+        daily_out = build_daily_chart(ticker_df, date_str)
+        if daily_out:
+            ok = tg_send_photo(daily_out, build_daily_caption(ticker_df, market_ctx, fear_greed, gold))
+            log.info("  ✓ Daily chart ส่งสำเร็จ" if ok else "  ✗ Daily chart ส่งล้มเหลว")
+    except Exception as e:
+        log.error(f"  Daily chart: {e}")
+        tg_send_text(f"⚠️ <b>Daily Chart error</b>\n{e}")
+else:
+    log.info("  ข้าม Daily Summary (SEND_DAILY=false)")
 
 # ── BOSWaves แต่ละ ticker ───────────────────────────────────────
 gemini_notified = False
@@ -745,12 +750,15 @@ for ticker in TICKERS:
         df    = ticker_df[ticker]
         extra = fetch_extra_info(ticker)
 
-        log.info(f"  ดึงข่าว...")
-        headlines = fetch_yahoo_news(ticker, NEWS_PER_TICKER)
-        news_th, gemini_err = translate_news_gemini(ticker, headlines)
-        if gemini_err and not gemini_notified:
-            tg_send_text(f"⚠️ <b>Gemini API มีปัญหา</b>\n<code>{gemini_err}</code>\n📰 ข่าวเป็นภาษาอังกฤษแทน")
-            gemini_notified = True
+        if SEND_NEWS:
+            log.info(f"  ดึงข่าว...")
+            headlines = fetch_yahoo_news(ticker, NEWS_PER_TICKER)
+            news_th, gemini_err = translate_news_gemini(ticker, headlines)
+            if gemini_err and not gemini_notified:
+                tg_send_text(f"⚠️ <b>Gemini API มีปัญหา</b>\n<code>{gemini_err}</code>\n📰 ข่าวเป็นภาษาอังกฤษแทน")
+                gemini_notified = True
+        else:
+            news_th = []; log.info(f"  ข้ามข่าว (SEND_NEWS=false)")
 
         close  = df['Close'].squeeze().values.astype(float)
         high   = df['High'].squeeze().values.astype(float)
@@ -914,11 +922,14 @@ for ticker in TICKERS:
 
         caption = build_caption(ticker,close[-1],bias_label,rsi_vals[-1],current_atr,
                                 entry_price,sl_price,tp_price,rr_ratio,extra,news_th)
-        ok = tg_send_photo(out, caption)
-        if ok:
-            log.info(f"  ✓ {ticker} เสร็จ ({(datetime.now()-t0).seconds}s)")
+        if SEND_CHART:
+            ok = tg_send_photo(out, caption)
+            if not ok: raise RuntimeError("tg_send_photo คืน False")
         else:
-            raise RuntimeError("tg_send_photo คืน False")
+            # ส่งแค่ข้อความ ไม่มีรูป
+            tg_send_text(f"<b>{ticker}</b>\n{caption}")
+            log.info(f"  ส่งแค่ข้อความ (SEND_CHART=false)")
+        log.info(f"  ✓ {ticker} เสร็จ ({(datetime.now()-t0).seconds}s)")
 
     except Exception as exc:
         log.error(f"  ✗ {ticker} ล้มเหลว: {exc}")
