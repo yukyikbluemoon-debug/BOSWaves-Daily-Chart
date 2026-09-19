@@ -435,7 +435,8 @@ def tg_send_photo(image_path: Path, caption: str) -> bool:
     import re as _re
     allowed = r'<(/?(b|i|u|s|code|pre|a))(\s[^>]*)?>|&[a-z]+;'
     # แทนที่ tag ที่ไม่รองรับด้วยช่องว่าง
-    cap = _re.sub(r'<(?!/?(?:b|i|u|s|code|pre|a)(?:\s[^>]*)?>)[^>]+>', '', cap)  
+    # เพิ่ม (?!\s) เพื่อป้องกันไม่ให้ Regex จับเครื่องหมาย < ที่ตามด้วยช่องว่าง (เช่น "< 30") แล้วไปลบ Tag ปิดทิ้ง
+    cap = _re.sub(r'<(?!\s)(?!/?(?:b|i|u|s|code|pre|a)(?:\s[^>]*)?>)[^>]+>', '', cap) 
     for r in RECIPIENTS:
         token = (r.get("bot_token") or "").strip() or MAIN_BOT_TOKEN
         cid   = r["chat_id"]
@@ -681,7 +682,7 @@ def build_caption(ticker, close_price, bias_label, rsi, atr,
         f"🎯 เป้ากำไร: <b>${tp:.2f}</b>  (R:R 1:{rr:.1f})\n"
         f"—————————————\n"
         f"<i>⚠️ ไม่ใช่คำแนะนำทางการเงิน</i>\n"
-        f"<i>⚠️ RSI — ถ้า > 70 มักปรับตัวลง, < 30 มักเด้งขึ้น</i>\n"
+        f"<i>⚠️ RSI — ถ้า &gt; 70 มักปรับตัวลง, &lt; 30 มักเด้งขึ้น</i>\n"
     )
 
 # ═══════════════════════════════════════════════════════════════════
