@@ -10,10 +10,12 @@
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:0 0 80px}
 .topbar{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:10}
 .topbar h1{font-size:16px;font-weight:600;flex:1}
-.topbar span{font-size:12px;color:var(--muted)}
+.topbar .right{display:flex;align-items:center;gap:8px}
+.pause-btn{font-size:12px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer}
+.pause-btn.paused{border-color:var(--danger);color:var(--danger);background:#2a1515}
 .body{padding:12px;display:flex;flex-direction:column;gap:12px;max-width:480px;margin:0 auto}
 .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
-.card-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px}
+.card-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
 .chip-wrap{display:flex;flex-wrap:wrap;gap:7px}
 .chip{padding:6px 12px;border-radius:20px;border:1px solid var(--border);font-size:13px;cursor:pointer;background:transparent;color:var(--muted);user-select:none;transition:.15s}
 .chip.on{background:var(--accent2);border-color:var(--accent);color:var(--accent)}
@@ -22,16 +24,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .inp-row input::placeholder{color:var(--muted)}
 .btn-sm{padding:7px 12px;border-radius:8px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:13px;cursor:pointer;white-space:nowrap}
 .btn-sm:active{background:var(--accent2)}
-.sched-item{display:grid;grid-template-columns:72px 1fr 36px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
-.sched-item:last-child{border-bottom:none}
-.time-lbl{font-size:13px;font-weight:500}
-.mini-wrap{display:flex;gap:5px}
+/* schedules */
+.sched-card{background:#1a1f2b;border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px}
+.sched-card:last-child{margin-bottom:0}
+.sched-row1{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.sched-time{font-size:14px;font-weight:600;flex:1}
+.sched-row2{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.sched-row3{display:flex;gap:5px;flex-wrap:wrap}
 .mini{font-size:12px;padding:4px 8px;border-radius:20px;border:1px solid var(--border);cursor:pointer;background:transparent;color:var(--muted);user-select:none}
 .mini.on{background:var(--accent2);border-color:var(--accent);color:var(--accent)}
-.del{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px;border-radius:6px}
+.day-chip{font-size:11px;padding:3px 7px;border-radius:12px;border:1px solid var(--border);cursor:pointer;background:transparent;color:var(--muted);user-select:none}
+.day-chip.on{background:#1a2d4a;border-color:#60A5FA;color:#60A5FA}
+.del{background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 6px;border-radius:6px}
 .del:hover{color:var(--danger);background:#2a1515}
+.btn-test-sched{font-size:11px;padding:3px 10px;border-radius:8px;border:1px solid #2E7D52;background:#0d2b1e;color:var(--accent);cursor:pointer}
+.btn-test-sched:active{background:#1a3d2a}
 .time-add{display:flex;gap:7px;margin-top:10px}
 .time-add input[type=time]{flex:1;background:#1e2330;border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:7px 10px}
+/* recipients */
 .recip-item{display:grid;grid-template-columns:1fr 48px 36px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
 .recip-item:last-child{border-bottom:none}
 .recip-name{font-size:13px;font-weight:500}
@@ -47,44 +57,81 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .recip-add input::placeholder{color:var(--muted)}
 .btn-block{width:100%;padding:9px;border-radius:8px;border:1px solid;font-size:13px;cursor:pointer;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px}
 .btn-test{border-color:#2E7D52;background:#0d2b1e;color:var(--accent)}
-.btn-test:active{background:#1a3d2a}
+.bot-tag{font-size:10px;color:var(--muted);background:#1e2330;border-radius:4px;padding:1px 5px;margin-left:4px}
+/* RSI mode */
+.radio-group{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.radio-item{display:flex;align-items:center;gap:8px;cursor:pointer}
+.radio-item input[type=radio]{accent-color:var(--accent)}
+.radio-item span{font-size:13px;color:var(--text)}
+.radio-item small{font-size:11px;color:var(--muted)}
+/* slider */
 .slider-wrap{margin-bottom:10px}
 .slider-wrap:last-child{margin-bottom:0}
 .slider-hd{display:flex;justify-content:space-between;margin-bottom:6px}
 .slider-hd span{font-size:13px;color:var(--muted)}
 .slider-hd strong{font-size:13px;color:var(--text)}
 input[type=range]{width:100%;accent-color:var(--accent);height:4px}
+/* status */
+.status-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.status-row:last-child{border-bottom:none}
+.status-val{color:var(--accent);font-weight:500}
+/* logs */
+.log-item{padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+.log-item:last-child{border-bottom:none}
+.log-ok{color:var(--accent)}
+.log-err{color:var(--danger)}
+/* save bar */
 .save-bar{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;background:var(--card);border-top:1px solid var(--border)}
 .btn-save{width:100%;max-width:480px;display:block;margin:0 auto;padding:13px;border-radius:12px;border:none;background:var(--accent);color:#000;font-size:15px;font-weight:600;cursor:pointer}
 .btn-save:active{opacity:.85}
 .toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#0d2b1e;border:1px solid var(--accent);color:var(--accent);padding:8px 20px;border-radius:20px;font-size:13px;display:none;z-index:100;white-space:nowrap}
-.status{font-size:11px;color:var(--muted);text-align:center;margin-top:6px}
-.bot-tag{font-size:10px;color:var(--muted);background:#1e2330;border-radius:4px;padding:1px 5px;margin-left:4px}
+.save-status{font-size:11px;color:var(--muted);text-align:center;margin-top:6px}
+.sec-title{font-size:12px;color:var(--muted);margin:10px 0 6px;font-weight:500}
 </style>
 </head>
 <body>
 <div class="topbar">
   <span>📈</span>
   <h1>BOSWaves ตั้งค่า</h1>
-  <span id="conn-status">กำลังโหลด...</span>
+  <div class="right">
+    <button class="pause-btn" id="pause-btn" onclick="togglePause()">⏸ หยุดชั่วคราว</button>
+    <span id="conn-status" style="font-size:12px;color:var(--muted)">กำลังโหลด...</span>
+  </div>
 </div>
+
 <div class="body">
+
+  <!-- หุ้น / ETF -->
   <div class="card">
-    <div class="card-title">หุ้น / ETF</div>
+    <div class="card-title">หุ้น / ETF (ส่งรูป chart)</div>
     <div class="chip-wrap" id="ticker-group"></div>
     <div class="inp-row">
       <input id="ticker-inp" placeholder="เพิ่ม เช่น QQQ" maxlength="6">
       <button class="btn-sm" onclick="addTicker()">+ เพิ่ม</button>
     </div>
   </div>
+
+  <!-- Watchlist -->
   <div class="card">
-    <div class="card-title">รอบส่ง (จันทร์–ศุกร์)</div>
+    <div class="card-title">Watchlist (แจ้ง RSI เฉพาะ ไม่ส่งรูป)</div>
+    <div class="chip-wrap" id="watch-group"></div>
+    <div class="inp-row">
+      <input id="watch-inp" placeholder="เช่น BTC-USD, QQQ" maxlength="10">
+      <button class="btn-sm" onclick="addWatch()">+ เพิ่ม</button>
+    </div>
+  </div>
+
+  <!-- รอบส่ง -->
+  <div class="card">
+    <div class="card-title">รอบส่ง</div>
     <div id="sched-list"></div>
     <div class="time-add">
       <input type="time" id="new-time" value="12:00">
       <button class="btn-sm" onclick="addSched()">+ เพิ่มรอบ</button>
     </div>
   </div>
+
+  <!-- ผู้รับ -->
   <div class="card">
     <div class="card-title">ผู้รับ Telegram</div>
     <div id="recip-list"></div>
@@ -98,6 +145,8 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px}
       ✉️ ทดสอบส่งให้ทุกคน
     </button>
   </div>
+
+  <!-- Gemini -->
   <div class="card">
     <div class="card-title">Gemini AI</div>
     <div class="chip-wrap" id="gemini-group">
@@ -106,8 +155,25 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px}
       <div class="chip" data-v="summary">สรุปภาพรวม</div>
     </div>
   </div>
+
+  <!-- RSI -->
   <div class="card">
     <div class="card-title">แจ้งเตือน RSI</div>
+    <div class="sec-title">โหมดแจ้งเตือน</div>
+    <div class="radio-group">
+      <label class="radio-item">
+        <input type="radio" name="rsi_mode" value="always">
+        <div><span>แจ้งทุกรอบที่รัน</span><br><small>ถ้า RSI ผิดปกติทุกรอบจะได้รับแจ้ง</small></div>
+      </label>
+      <label class="radio-item">
+        <input type="radio" name="rsi_mode" value="once_per_day" checked>
+        <div><span>ครั้งแรกของวันเท่านั้น</span><br><small>แนะนำ — ไม่รำคาญ</small></div>
+      </label>
+      <label class="radio-item">
+        <input type="radio" name="rsi_mode" value="off">
+        <div><span>ปิดการแจ้งเตือน RSI</span></div>
+      </label>
+    </div>
     <div class="slider-wrap">
       <div class="slider-hd">
         <span>🔥 ราคาร้อนแรงเกินไป (Overbought)</span>
@@ -125,31 +191,68 @@ input[type=range]{width:100%;accent-color:var(--accent);height:4px}
              oninput="document.getElementById('os-v').textContent=this.value">
     </div>
   </div>
+
+  <!-- สรุปสัปดาห์ -->
+  <div class="card">
+    <div class="card-title" style="justify-content:space-between">
+      <span>สรุปสัปดาห์ (วันเสาร์)</span>
+      <label class="sw" style="flex-shrink:0">
+        <input type="checkbox" id="weekly-sw" checked>
+        <div class="sw-track"></div><div class="sw-thumb"></div>
+      </label>
+    </div>
+    <div style="font-size:12px;color:var(--muted)">ส่งสรุป % การเปลี่ยนแปลง 5 วันของแต่ละ ticker ทุกวันเสาร์</div>
+  </div>
+
+  <!-- System Status -->
+  <div class="card">
+    <div class="card-title">
+      <span>System Status</span>
+      <button class="btn-sm" onclick="loadStatus()" style="font-size:11px;padding:3px 8px">รีเฟรช</button>
+    </div>
+    <div id="status-content">
+      <div style="color:var(--muted);font-size:13px">กำลังโหลด...</div>
+    </div>
+  </div>
+
+  <!-- ประวัติการส่ง -->
+  <div class="card">
+    <div class="card-title">
+      <span>ประวัติการส่ง</span>
+      <button class="btn-sm" onclick="loadLogs()" style="font-size:11px;padding:3px 8px">โหลด</button>
+    </div>
+    <div id="log-list">
+      <div style="color:var(--muted);font-size:13px">กด "โหลด" เพื่อดูประวัติ</div>
+    </div>
+  </div>
+
 </div>
+
 <div class="toast" id="toast"></div>
 <div class="save-bar">
   <button class="btn-save" onclick="saveConfig()">💾 บันทึกการตั้งค่า</button>
-  <div class="status" id="save-status"></div>
+  <div class="save-status" id="save-status"></div>
 </div>
+
 <script>
 const SUPABASE_URL = 'https://acfwyzfntiuackcnarvo.supabase.co'
-const SERVICE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjZnd5emZudGl1YWNrY25hcnZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwMjkzMTEsImV4cCI6MjEwNDYwNTMxMX0.WcfGuDP6geA_ug3v1RYy0fVDLKhizaTKfL-8bky4wRQ'
-const hdr = {
-  'apikey': SERVICE_KEY,
-  'Authorization': 'Bearer '+SERVICE_KEY,
-  'Content-Type': 'application/json',
-  'Prefer': 'return=representation'
-}
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjZnd5emZudGl1YWNrY25hcnZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwMjkzMTEsImV4cCI6MjEwNDYwNTMxMX0.WcfGuDP6geA_ug3v1RYy0fVDLKhizaTKfL-8bky4wRQ'
+const hdr = {'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'}
+
+const DAYS = ['อา','จ','อ','พ','พฤ','ศ','ส']
+
 let state = {
-  tickers:['VOO','NVDA','JEPQ'],
+  tickers:['VOO','NVDA','JEPQ'], watchlist:[],
   schedules:[
-    {time:'08:00',chart:true,news:true,daily:true},
-    {time:'15:00',chart:false,news:true,daily:false},
-    {time:'03:00',chart:true,news:false,daily:true}
+    {time:'08:00',days:[1,2,3,4,5],chart:true,news:true,daily:true},
+    {time:'15:00',days:[1,2,3,4,5],chart:false,news:true,daily:false},
+    {time:'03:00',days:[1,2,3,4,5],chart:true,news:false,daily:true}
   ],
   gemini:{translate:true,sentiment:true,summary:false},
-  rsi_overbought:70,rsi_oversold:30,bot_token:'',recipients:[]
+  rsi_overbought:70,rsi_oversold:30,rsi_alert_mode:'once_per_day',
+  bot_token:'',recipients:[],paused:false,weekly_summary:true
 }
+
 async function init(){
   try {
     const [cfgRes,recRes] = await Promise.all([
@@ -161,12 +264,18 @@ async function init(){
     const recRows = await recRes.json()
     if(cfgRows.length){
       const c = cfgRows[0]
-      if(c.tickers)        state.tickers        = c.tickers
-      if(c.schedules)      state.schedules      = c.schedules
-      if(c.gemini)         state.gemini         = c.gemini
-      if(c.rsi_overbought) state.rsi_overbought = c.rsi_overbought
-      if(c.rsi_oversold)   state.rsi_oversold   = c.rsi_oversold
-      if(c.bot_token)      state.bot_token      = c.bot_token
+      if(c.tickers)          state.tickers          = c.tickers
+      if(c.watchlist)        state.watchlist        = c.watchlist
+      if(c.schedules)        state.schedules        = c.schedules.map(function(s){
+        return Object.assign({days:[1,2,3,4,5],chart:true,news:true,daily:true},s)
+      })
+      if(c.gemini)           state.gemini           = c.gemini
+      if(c.rsi_overbought)   state.rsi_overbought   = c.rsi_overbought
+      if(c.rsi_oversold)     state.rsi_oversold     = c.rsi_oversold
+      if(c.rsi_alert_mode)   state.rsi_alert_mode   = c.rsi_alert_mode
+      if(c.bot_token)        state.bot_token        = c.bot_token
+      if(c.paused!==undefined) state.paused         = c.paused
+      if(c.weekly_summary!==undefined) state.weekly_summary = c.weekly_summary
     }
     state.recipients = recRows || []
     document.getElementById('conn-status').textContent = '🟢 เชื่อมต่อแล้ว'
@@ -175,214 +284,329 @@ async function init(){
     showToast('โหลดไม่ได้: '+e.message)
   }
   renderAll()
+  loadStatus()
 }
+
 function renderAll(){
-  renderTickers(); renderScheds(); renderRecips(); renderGemini()
-  document.getElementById('ob').value = state.rsi_overbought
+  renderTickers(); renderWatchlist(); renderScheds()
+  renderRecips(); renderGemini()
+  document.getElementById('ob').value     = state.rsi_overbought
   document.getElementById('ob-v').textContent = state.rsi_overbought
-  document.getElementById('os').value = state.rsi_oversold
+  document.getElementById('os').value     = state.rsi_oversold
   document.getElementById('os-v').textContent = state.rsi_oversold
+  document.querySelectorAll('input[name=rsi_mode]').forEach(function(r){
+    r.checked = (r.value === state.rsi_alert_mode)
+  })
+  document.getElementById('weekly-sw').checked = state.weekly_summary
+  var pb = document.getElementById('pause-btn')
+  pb.textContent = state.paused ? '▶ เปิดระบบ' : '⏸ หยุดชั่วคราว'
+  pb.className   = 'pause-btn' + (state.paused ? ' paused' : '')
 }
+
+// ── Tickers ──────────────────────────────────────────────────────
 function renderTickers(){
-  const g = document.getElementById('ticker-group')
-  g.innerHTML = ''
+  const g = document.getElementById('ticker-group'); g.innerHTML = ''
   state.tickers.forEach(function(t){
-    const d = document.createElement('div')
-    d.className = 'chip on'
-    d.textContent = t
-    d.onclick = function(){ state.tickers = state.tickers.filter(function(x){return x!==t}); renderTickers() }
+    const d = document.createElement('div'); d.className='chip on'; d.textContent=t
+    d.onclick = function(){ state.tickers=state.tickers.filter(function(x){return x!==t}); renderTickers() }
     g.appendChild(d)
   })
 }
 function addTicker(){
-  const v = document.getElementById('ticker-inp').value.trim().toUpperCase()
-  if(!v || state.tickers.indexOf(v)>=0) return
-  state.tickers.push(v)
-  renderTickers()
-  document.getElementById('ticker-inp').value = ''
+  const v=document.getElementById('ticker-inp').value.trim().toUpperCase()
+  if(!v||state.tickers.indexOf(v)>=0) return
+  state.tickers.push(v); renderTickers()
+  document.getElementById('ticker-inp').value=''
 }
 document.addEventListener('keydown',function(e){
-  if(e.key==='Enter' && document.activeElement.id==='ticker-inp') addTicker()
+  if(e.key==='Enter'&&document.activeElement.id==='ticker-inp') addTicker()
 })
+
+// ── Watchlist ────────────────────────────────────────────────────
+function renderWatchlist(){
+  const g=document.getElementById('watch-group'); g.innerHTML=''
+  state.watchlist.forEach(function(t){
+    const d=document.createElement('div'); d.className='chip on'
+    d.style.borderColor='#F97316'; d.style.color='#F97316'
+    d.textContent=t
+    d.onclick=function(){ state.watchlist=state.watchlist.filter(function(x){return x!==t}); renderWatchlist() }
+    g.appendChild(d)
+  })
+}
+function addWatch(){
+  const v=document.getElementById('watch-inp').value.trim().toUpperCase()
+  if(!v||state.watchlist.indexOf(v)>=0) return
+  state.watchlist.push(v); renderWatchlist()
+  document.getElementById('watch-inp').value=''
+}
+
+// ── Schedules ─────────────────────────────────────────────────────
 function renderScheds(){
-  const el = document.getElementById('sched-list')
-  el.innerHTML = ''
+  const el=document.getElementById('sched-list'); el.innerHTML=''
   state.schedules.forEach(function(s,i){
-    const h = parseInt(s.time)
-    const icon = h<12?'🌅':h<18?'🕐':'🌙'
-    const row = document.createElement('div')
-    row.className = 'sched-item'
-    const lbl = document.createElement('span')
-    lbl.className = 'time-lbl'
-    lbl.textContent = icon+' '+s.time
-    const wrap = document.createElement('div')
-    wrap.className = 'mini-wrap'
+    const h=parseInt(s.time)
+    const icon=h<12?'🌅':h<18?'🕐':'🌙'
+    const card=document.createElement('div'); card.className='sched-card'
+
+    // row 1: เวลา + ทดสอบ + ลบ
+    const r1=document.createElement('div'); r1.className='sched-row1'
+    const tlbl=document.createElement('span'); tlbl.className='sched-time'
+    tlbl.textContent=icon+' '+s.time; r1.appendChild(tlbl)
+    const tBtn=document.createElement('button'); tBtn.className='btn-test-sched'
+    tBtn.textContent='📤 ทดสอบ'
+    tBtn.addEventListener('click',function(){ testSchedSend(i,tBtn) })
+    r1.appendChild(tBtn)
+    const dBtn=document.createElement('button'); dBtn.className='del'
+    dBtn.textContent='🗑'
+    dBtn.addEventListener('click',function(){ state.schedules.splice(i,1); renderScheds() })
+    r1.appendChild(dBtn); card.appendChild(r1)
+
+    // row 2: วัน
+    const r2=document.createElement('div'); r2.className='sched-row2'
+    var days=s.days||[1,2,3,4,5]
+    ;[0,1,2,3,4,5,6].forEach(function(d){
+      const dc=document.createElement('div'); dc.className='day-chip'+(days.indexOf(d)>=0?' on':'')
+      dc.textContent=DAYS[d]
+      dc.addEventListener('click',function(){
+        var idx=state.schedules[i].days.indexOf(d)
+        if(idx>=0) state.schedules[i].days.splice(idx,1)
+        else state.schedules[i].days.push(d)
+        dc.classList.toggle('on', state.schedules[i].days.indexOf(d)>=0)
+      })
+      r2.appendChild(dc)
+    })
+    card.appendChild(r2)
+
+    // row 3: กราฟ/ข่าว/สรุป
+    const r3=document.createElement('div'); r3.className='sched-row3'
     var keys=['chart','news','daily'], labels=['กราฟ','ข่าว','สรุป']
     keys.forEach(function(key,ki){
-      const m = document.createElement('div')
-      m.className = 'mini'+(s[key]?' on':'')
-      m.textContent = labels[ki]
+      const m=document.createElement('div'); m.className='mini'+(s[key]?' on':'')
+      m.textContent=labels[ki]
       m.addEventListener('click',function(){
-        state.schedules[i][key] = !state.schedules[i][key]
+        state.schedules[i][key]=!state.schedules[i][key]
         m.classList.toggle('on',state.schedules[i][key])
       })
-      wrap.appendChild(m)
+      r3.appendChild(m)
     })
-    const btn = document.createElement('button')
-    btn.className = 'del'
-    btn.textContent = '🗑'
-    btn.addEventListener('click',function(){ state.schedules.splice(i,1); renderScheds() })
-    row.appendChild(lbl); row.appendChild(wrap); row.appendChild(btn)
-    el.appendChild(row)
+    card.appendChild(r3); el.appendChild(card)
   })
 }
 function addSched(){
-  const t = document.getElementById('new-time').value
-  if(!t) return
-  state.schedules.push({time:t,chart:true,news:true,daily:true})
+  const t=document.getElementById('new-time').value; if(!t) return
+  state.schedules.push({time:t,days:[1,2,3,4,5],chart:true,news:true,daily:true})
   renderScheds()
 }
+
+async function testSchedSend(i, btn){
+  btn.textContent='⏳'; btn.disabled=true
+  const mainToken=state.bot_token||''
+  const activeRecips=state.recipients.filter(function(r){ return r.active })
+  var ok=0
+  for(var ri=0;ri<activeRecips.length;ri++){
+    const r=activeRecips[ri]
+    const token=(r.bot_token&&r.bot_token.trim())?r.bot_token.trim():mainToken
+    if(!token) continue
+    try {
+      const res=await fetch('https://api.telegram.org/bot'+token+'/sendMessage',
+        {method:'POST',headers:{'Content-Type':'application/json'},
+         body:JSON.stringify({
+           chat_id:r.chat_id,
+           text:'📤 ทดสอบรอบ '+state.schedules[i].time+'\nผู้รับ: '+r.name+'\nเวลา: '+new Date().toLocaleString('th-TH')
+         })})
+      if(res.ok) ok++
+    } catch(e){}
+  }
+  showToast(ok>0?'ส่งสำเร็จ '+ok+' คน ✓':'ส่งไม่ได้')
+  btn.textContent='📤 ทดสอบ'; btn.disabled=false
+}
+
+// ── Recipients ───────────────────────────────────────────────────
 function renderRecips(){
-  const el = document.getElementById('recip-list')
-  el.innerHTML = ''
+  const el=document.getElementById('recip-list'); el.innerHTML=''
   state.recipients.forEach(function(r,i){
-    const row = document.createElement('div')
-    row.className = 'recip-item'
-    const masked = r.chat_id.length>4 ? r.chat_id.slice(0,-4)+'****' : r.chat_id
-    // info — แสดง badge ถ้าใช้บอทต่างกัน
-    const info = document.createElement('div')
-    const nm = document.createElement('div')
-    nm.className = 'recip-name'
-    nm.textContent = r.name
+    const row=document.createElement('div'); row.className='recip-item'
+    const masked=r.chat_id.length>4?r.chat_id.slice(0,-4)+'****':r.chat_id
+    const info=document.createElement('div')
+    const nm=document.createElement('div'); nm.className='recip-name'; nm.textContent=r.name
     if(r.bot_token){
-      const tag = document.createElement('span')
-      tag.className = 'bot-tag'
-      tag.textContent = 'บอทของตัวเอง'
+      const tag=document.createElement('span'); tag.className='bot-tag'; tag.textContent='บอทของตัวเอง'
       nm.appendChild(tag)
     }
-    const rd = document.createElement('div')
-    rd.className = 'recip-id'
-    rd.textContent = masked
+    const rd=document.createElement('div'); rd.className='recip-id'; rd.textContent=masked
     info.appendChild(nm); info.appendChild(rd)
-    // switch
-    const sw = document.createElement('label')
-    sw.className = 'sw'
-    const chk = document.createElement('input')
-    chk.type = 'checkbox'
-    chk.checked = r.active === true
-    chk.addEventListener('change',function(){ state.recipients[i].active = chk.checked })
-    const track = document.createElement('div')
-    track.className = 'sw-track'
-    const thumb = document.createElement('div')
-    thumb.className = 'sw-thumb'
+    const sw=document.createElement('label'); sw.className='sw'
+    const chk=document.createElement('input'); chk.type='checkbox'; chk.checked=r.active===true
+    chk.addEventListener('change',function(){ state.recipients[i].active=chk.checked })
+    const track=document.createElement('div'); track.className='sw-track'
+    const thumb=document.createElement('div'); thumb.className='sw-thumb'
     sw.appendChild(chk); sw.appendChild(track); sw.appendChild(thumb)
-    // delete
-    const del = document.createElement('button')
-    del.className = 'del'
-    del.textContent = '🗑'
+    const del=document.createElement('button'); del.className='del'; del.textContent='🗑'
     del.addEventListener('click',function(){ delRecip(i) })
     row.appendChild(info); row.appendChild(sw); row.appendChild(del)
     el.appendChild(row)
   })
 }
 async function delRecip(i){
-  const r = state.recipients[i]
+  const r=state.recipients[i]
   if(r.id) await fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients?id=eq.'+r.id,{method:'DELETE',headers:hdr})
-  state.recipients.splice(i,1)
-  renderRecips()
+  state.recipients.splice(i,1); renderRecips()
+  showToast('ลบผู้รับสำเร็จ ✓')
 }
 async function addRecip(){
-  const name    = document.getElementById('rname').value.trim()
-  const chat_id = document.getElementById('rid').value.trim()
-  const token   = document.getElementById('rtoken').value.trim()
+  const name=document.getElementById('rname').value.trim()
+  const chat_id=document.getElementById('rid').value.trim()
+  const token=document.getElementById('rtoken').value.trim()
   if(!name||!chat_id){ showToast('กรุณาใส่ชื่อและ Chat ID'); return }
   try {
-    const body = {name:name, chat_id:chat_id, active:true, bot_token:token}
-    const res  = await fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients',
-      {method:'POST',headers:hdr,body:JSON.stringify(body)})
-    const rows = await res.json()
-    state.recipients.push(rows[0] || body)
+    const res=await fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients',
+      {method:'POST',headers:hdr,body:JSON.stringify({name:name,chat_id:chat_id,active:true,bot_token:token})})
+    if(!res.ok){ const e=await res.text(); showToast('เพิ่มไม่ได้: '+e); return }
+    const rows=await res.json()
+    state.recipients.push(rows[0]||{name:name,chat_id:chat_id,active:true,bot_token:token})
     renderRecips()
-    document.getElementById('rname').value  = ''
-    document.getElementById('rid').value    = ''
-    document.getElementById('rtoken').value = ''
+    document.getElementById('rname').value=''
+    document.getElementById('rid').value=''
+    document.getElementById('rtoken').value=''
     showToast('เพิ่มผู้รับสำเร็จ ✓')
   } catch(e){ showToast('เพิ่มไม่ได้: '+e.message) }
 }
+
+// ── Gemini ───────────────────────────────────────────────────────
 function renderGemini(){
   document.querySelectorAll('#gemini-group .chip').forEach(function(c){
     c.classList.toggle('on',!!state.gemini[c.dataset.v])
-    c.onclick = function(){
-      state.gemini[c.dataset.v] = !state.gemini[c.dataset.v]
+    c.onclick=function(){
+      state.gemini[c.dataset.v]=!state.gemini[c.dataset.v]
       c.classList.toggle('on',state.gemini[c.dataset.v])
     }
   })
 }
+
+// ── Pause ────────────────────────────────────────────────────────
+function togglePause(){
+  state.paused=!state.paused
+  var pb=document.getElementById('pause-btn')
+  pb.textContent=state.paused?'▶ เปิดระบบ':'⏸ หยุดชั่วคราว'
+  pb.className='pause-btn'+(state.paused?' paused':'')
+  showToast(state.paused?'⏸ ระบบถูกหยุดชั่วคราว':'▶ ระบบเปิดทำงานแล้ว')
+}
+
+// ── Test Send ─────────────────────────────────────────────────────
 async function testSend(){
-  const btn = document.getElementById('test-btn')
-  btn.textContent = '⏳ กำลังส่ง...'
-  btn.disabled = true
-  const mainToken   = state.bot_token || ''
-  const activeRecips = state.recipients.filter(function(r){ return r.active })
-  if(!mainToken && !activeRecips.some(function(r){ return r.bot_token })){
-    showToast('ไม่มี Bot Token')
-    btn.textContent = '✉️ ทดสอบส่งให้ทุกคน'
-    btn.disabled = false
-    return
-  }
-  var ok = 0
-  for(var ri=0; ri<activeRecips.length; ri++){
-    const r = activeRecips[ri]
-    // ใช้ bot_token ของผู้รับ ถ้าไม่มีใช้บอทหลัก
-    const token = (r.bot_token && r.bot_token.trim()) ? r.bot_token.trim() : mainToken
+  const btn=document.getElementById('test-btn')
+  btn.textContent='⏳ กำลังส่ง...'; btn.disabled=true
+  const mainToken=state.bot_token||''
+  const activeRecips=state.recipients.filter(function(r){ return r.active })
+  var ok=0
+  for(var ri=0;ri<activeRecips.length;ri++){
+    const r=activeRecips[ri]
+    const token=(r.bot_token&&r.bot_token.trim())?r.bot_token.trim():mainToken
     if(!token) continue
     try {
-      const res = await fetch(
-        'https://api.telegram.org/bot'+token+'/sendMessage',
+      const res=await fetch('https://api.telegram.org/bot'+token+'/sendMessage',
         {method:'POST',headers:{'Content-Type':'application/json'},
          body:JSON.stringify({
-           chat_id: r.chat_id,
-           text: '✅ BOSWaves ทดสอบส่งสำเร็จ!\nผู้รับ: '+r.name+'\nเวลา: '+new Date().toLocaleString('th-TH')
+           chat_id:r.chat_id,
+           text:'✅ BOSWaves ทดสอบส่งสำเร็จ!\nผู้รับ: '+r.name+'\nเวลา: '+new Date().toLocaleString('th-TH')
          })})
       if(res.ok) ok++
     } catch(e){}
   }
-  showToast(ok>0 ? 'ส่งสำเร็จ '+ok+'/'+activeRecips.length+' คน ✓' : 'ส่งไม่ได้ ตรวจสอบ Token')
-  btn.textContent = '✉️ ทดสอบส่งให้ทุกคน'
-  btn.disabled = false
+  showToast(ok>0?'ส่งสำเร็จ '+ok+'/'+activeRecips.length+' คน ✓':'ส่งไม่ได้ ตรวจสอบ Token')
+  btn.textContent='✉️ ทดสอบส่งให้ทุกคน'; btn.disabled=false
 }
-async function saveConfig(){
-  const btn = document.querySelector('.btn-save')
-  btn.textContent = '💾 กำลังบันทึก...'
-  btn.disabled = true
+
+// ── System Status ─────────────────────────────────────────────────
+async function loadStatus(){
   try {
-    const cfgBody = {
-      tickers: state.tickers, schedules: state.schedules, gemini: state.gemini,
-      rsi_overbought: parseInt(document.getElementById('ob').value),
-      rsi_oversold:   parseInt(document.getElementById('os').value),
-      updated_at: new Date().toISOString()
+    const [cfgRes, logRes] = await Promise.all([
+      fetch(SUPABASE_URL+'/rest/v1/boswaves_config?id=eq.1&select=updated_at,paused',{headers:hdr}),
+      fetch(SUPABASE_URL+'/rest/v1/boswaves_logs?select=*&order=run_at.desc&limit=1',{headers:hdr})
+    ])
+    const cfg  = (await cfgRes.json())[0] || {}
+    const logs = await logRes.json()
+    const last = logs[0]
+    const el   = document.getElementById('status-content')
+    el.innerHTML = ''
+    function row(label, val, cls){
+      const r=document.createElement('div'); r.className='status-row'
+      r.innerHTML='<span>'+label+'</span><span class="status-val '+(cls||'')+'">'+val+'</span>'
+      el.appendChild(r)
+    }
+    row('สถานะระบบ', state.paused?'⏸ หยุดชั่วคราว':'✅ ทำงานปกติ', state.paused?'log-err':'log-ok')
+    if(last){
+      const dt=new Date(last.run_at)
+      row('รันล่าสุด', dt.toLocaleString('th-TH'))
+      row('ผลลัพธ์', last.success?'✅ สำเร็จ':'❌ ล้มเหลว', last.success?'log-ok':'log-err')
+      row('ใช้เวลา', last.duration_s+'s')
+    } else {
+      row('รันล่าสุด','ยังไม่มีข้อมูล')
+    }
+    row('config อัปเดต', cfg.updated_at?new Date(cfg.updated_at).toLocaleString('th-TH'):'-')
+  } catch(e){
+    document.getElementById('status-content').innerHTML='<div style="color:var(--muted);font-size:13px">โหลดไม่ได้</div>'
+  }
+}
+
+// ── Logs ─────────────────────────────────────────────────────────
+async function loadLogs(){
+  const el=document.getElementById('log-list')
+  el.innerHTML='<div style="color:var(--muted);font-size:13px">กำลังโหลด...</div>'
+  try {
+    const res=await fetch(SUPABASE_URL+'/rest/v1/boswaves_logs?select=*&order=run_at.desc&limit=10',{headers:hdr})
+    const rows=await res.json()
+    el.innerHTML=''
+    if(!rows.length){ el.innerHTML='<div style="color:var(--muted);font-size:13px">ยังไม่มีประวัติ</div>'; return }
+    rows.forEach(function(r){
+      const dt=new Date(r.run_at)
+      const item=document.createElement('div'); item.className='log-item'
+      item.innerHTML=(r.success?'<span class="log-ok">✅</span>':'<span class="log-err">❌</span>')+
+        ' '+dt.toLocaleString('th-TH')+
+        ' — '+(r.tickers||[]).join(', ')+
+        ' ('+r.duration_s+'s, '+r.recipients+' คน)'+(r.note?' <span style="color:var(--muted)">'+r.note+'</span>':'')
+      el.appendChild(item)
+    })
+  } catch(e){ el.innerHTML='<div style="color:var(--muted);font-size:13px">โหลดไม่ได้</div>' }
+}
+
+// ── Save ──────────────────────────────────────────────────────────
+async function saveConfig(){
+  const btn=document.querySelector('.btn-save')
+  btn.textContent='💾 กำลังบันทึก...'; btn.disabled=true
+  try {
+    const rsi_mode=document.querySelector('input[name=rsi_mode]:checked')
+    const cfgBody={
+      tickers:       state.tickers,
+      watchlist:     state.watchlist,
+      schedules:     state.schedules,
+      gemini:        state.gemini,
+      rsi_overbought:parseInt(document.getElementById('ob').value),
+      rsi_oversold:  parseInt(document.getElementById('os').value),
+      rsi_alert_mode:rsi_mode?rsi_mode.value:'once_per_day',
+      paused:        state.paused,
+      weekly_summary:document.getElementById('weekly-sw').checked,
+      updated_at:    new Date().toISOString()
     }
     await fetch(SUPABASE_URL+'/rest/v1/boswaves_config?id=eq.1',
       {method:'PATCH',headers:hdr,body:JSON.stringify(cfgBody)})
-    for(var ri=0; ri<state.recipients.length; ri++){
-      const r = state.recipients[ri]
-      if(r.id){
-        await fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients?id=eq.'+r.id,
-          {method:'PATCH',headers:hdr,body:JSON.stringify({active:r.active})})
-      }
+    for(var ri=0;ri<state.recipients.length;ri++){
+      const r=state.recipients[ri]
+      if(r.id) await fetch(SUPABASE_URL+'/rest/v1/boswaves_recipients?id=eq.'+r.id,
+        {method:'PATCH',headers:hdr,body:JSON.stringify({active:r.active})})
     }
-    document.getElementById('save-status').textContent = 'บันทึกเมื่อ '+new Date().toLocaleTimeString('th-TH')
+    document.getElementById('save-status').textContent='บันทึกเมื่อ '+new Date().toLocaleTimeString('th-TH')
     showToast('บันทึกสำเร็จ ✓')
+    loadStatus()
   } catch(e){ showToast('บันทึกไม่ได้: '+e.message) }
-  btn.textContent = '💾 บันทึกการตั้งค่า'
-  btn.disabled = false
+  btn.textContent='💾 บันทึกการตั้งค่า'; btn.disabled=false
 }
+
 function showToast(msg){
-  const t = document.getElementById('toast')
-  t.textContent = msg
-  t.style.display = 'block'
-  setTimeout(function(){ t.style.display='none' },3000)
+  const t=document.getElementById('toast'); t.textContent=msg
+  t.style.display='block'; setTimeout(function(){ t.style.display='none' },3000)
 }
+
 init()
 </script>
 </body>
