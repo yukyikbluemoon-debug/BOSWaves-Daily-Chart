@@ -626,6 +626,40 @@ def build_caption(ticker, close_price, bias_label, rsi, atr,
     news_block = ""
     if news_th:
         news_block = "━━━━━━━━━━━━━━━━\n📰 ข่าวล่าสุด:\n" + "\n".join(f"• {h}" for h in news_th) + "\n"
+
+    # [+42] ประเมินสถานการณ์ rule-based
+    score = 0
+    if bias_label == "BULLISH":               score += 3
+    elif bias_label == "BEARISH":             score -= 3
+    if rsi < RSI_OVERBOUGHT and rsi > 45:     score += 1
+    if rsi > RSI_OVERSOLD  and rsi < 55:      score -= 1
+    if rsi <= RSI_OVERSOLD:                   score += 2
+    if rsi >= RSI_OVERBOUGHT:                 score -= 2
+    if rr and rr >= 3.0:                      score += 2
+    elif rr and rr >= 2.0:                    score += 1
+
+    score = max(-5, min(5, score))  # clamp -5 ถึง 5
+
+    up_pct   = 30 + score * 8
+    down_pct = 30 - score * 8
+    hold_pct = 100 - up_pct - down_pct
+    up_pct   = max(5,  min(85, up_pct))
+    down_pct = max(5,  min(85, down_pct))
+    hold_pct = max(5,  min(50, hold_pct))
+
+    if score >= 2:      rec = "🟢 น่าสนใจ — รอซื้อที่แนวรับ"
+    elif score <= -2:   rec = "🔴 ระวัง — ยังไม่ควรเข้า"
+    else:               rec = "🟡 รอดู — ถือหรือสังเกตก่อน"
+
+    assess_block = (
+        f"━━━━━━━━━━━━━━━━\n"
+        f"🎲 ประเมินสถานการณ์\n"
+        f"📈 โอกาสขึ้น: <b>{up_pct}%</b>\n"
+        f"📉 โอกาสลง: <b>{down_pct}%</b>\n"
+        f"⏸ ทรงตัว: <b>{hold_pct}%</b>\n"
+        f"💡 {rec}\n"
+    )
+
     return (
         f"<b>{ticker} — วิเคราะห์โครงสร้างราคา</b>\n"
         f"{bias_tag} {bias_th}  |  ราคา: <b>${close_price:.2f}</b>\n"
