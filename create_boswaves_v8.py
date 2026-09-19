@@ -429,6 +429,7 @@ def translate_news_gemini(ticker: str, headlines: list[str]) -> tuple[list[str],
 # ═══════════════════════════════════════════════════════════════════
 def tg_send_photo(image_path: Path, caption: str) -> bool:
     ok_count = 0
+    cap = caption[:1020]+'…' if len(caption)>1024 else caption
     for r in RECIPIENTS:
         token = (r.get("bot_token") or "").strip() or MAIN_BOT_TOKEN
         cid   = r["chat_id"]
@@ -436,9 +437,7 @@ def tg_send_photo(image_path: Path, caption: str) -> bool:
         try:
             with open(image_path,"rb") as f:
                 resp = requests.post(url,
-                    cap = caption[:1020] + '…' if len(caption) > 1024 else caption
                     data={"chat_id":cid,"caption":cap,"parse_mode":"HTML"},
-                    
                     files={"photo":f}, timeout=TG_TIMEOUT)
             if resp.status_code==200 and resp.json().get("ok"): ok_count+=1
             else: log.error(f"  TG photo [{cid}] status={resp.status_code}: {resp.text[:200]}")
