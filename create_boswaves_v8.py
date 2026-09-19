@@ -138,6 +138,9 @@ DOWNLOAD_RETRIES  = 3
 DOWNLOAD_DELAY    = 5
 TG_TIMEOUT        = 30
 NEWS_PER_TICKER   = 3
+SEND_CHART = os.getenv("SEND_CHART", "true").lower() == "true"
+SEND_NEWS  = os.getenv("SEND_NEWS",  "true").lower() == "true"
+SEND_DAILY = os.getenv("SEND_DAILY", "true").lower() == "true"
 
 # ═══════════════════════════════════════════════════════════════════
 #  LOGGING
