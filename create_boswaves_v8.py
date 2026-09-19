@@ -430,6 +430,7 @@ def translate_news_gemini(ticker: str, headlines: list[str]) -> tuple[list[str],
 def tg_send_photo(image_path: Path, caption: str) -> bool:
     ok_count = 0
     cap = caption[:1020]+'…' if len(caption)>1024 else caption
+    log.info(f"  caption length: {len(caption)} → {len(cap)}")
     for r in RECIPIENTS:
         token = (r.get("bot_token") or "").strip() or MAIN_BOT_TOKEN
         cid   = r["chat_id"]
@@ -676,8 +677,6 @@ def build_caption(ticker, close_price, bias_label, rsi, atr,
         f"━━━━━━━━━━━━━━━━\n"
         f"<i>⚠️ ไม่ใช่คำแนะนำทางการเงิน</i>\n"
         f"<i>⚠️ RSI — ถ้า > 70 มักปรับตัวลง, < 30 มักเด้งขึ้น</i>\n"
-        f"<i>⚠️ EMA 50/200 — ถ้า EMA50 ตัดขึ้น EMA200 = สัญญาณขาขึ้น</i>\n"
-        f"<i>⚠️ R:R — คำนวณจุดที่คุ้มเสี่ยงที่สุด</i>\n"
     )
 
 # ═══════════════════════════════════════════════════════════════════
