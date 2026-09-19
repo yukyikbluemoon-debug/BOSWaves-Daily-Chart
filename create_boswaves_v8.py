@@ -436,10 +436,12 @@ def tg_send_photo(image_path: Path, caption: str) -> bool:
         try:
             with open(image_path,"rb") as f:
                 resp = requests.post(url,
-                    data={"chat_id":cid,"caption":caption,"parse_mode":"HTML"},
+                    cap = caption[:1020] + '…' if len(caption) > 1024 else caption
+                    data={"chat_id":cid,"caption":cap,"parse_mode":"HTML"},
+                    
                     files={"photo":f}, timeout=TG_TIMEOUT)
             if resp.status_code==200 and resp.json().get("ok"): ok_count+=1
-            else: log.error(f"  TG photo [{cid}]: {resp.text[:100]}")
+            else: log.error(f"  TG photo [{cid}] status={resp.status_code}: {resp.text[:200]}")
         except Exception as e: log.error(f"  TG photo [{cid}]: {e}")
     return ok_count>0
 
