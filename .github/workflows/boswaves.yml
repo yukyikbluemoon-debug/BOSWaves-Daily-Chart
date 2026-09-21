@@ -1,11 +1,13 @@
 name: BOSWaves Daily Chart
 
+
+
 on:
   schedule:
-    - cron: '0 1 * * 1-5'
-    - cron: '0 8 * * 1-5'
-    - cron: '0 20 * * 1-5'
-    - cron: '0 3 * * 6'
+    - cron: '17 1 * * 1-5'   # 08:17
+    - cron: '17 8 * * 1-5'   # 15:17
+    - cron: '17 13 * * 1-5'  # 20:17
+    - cron: '17 3 * * 6'     # 10:17
   workflow_dispatch:
     inputs:
       send_chart:
